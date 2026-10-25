@@ -1004,4 +1004,28 @@ export const JA_MESSAGES: Record<string, string> = {
   "Connect apps": "アプリを接続",
   "Bring your own key. ElevenLabs, OpenAI, Cartesia, and Fish Audio all plug into the same speak buttons.":
     "ご自身のキーを使用できます。ElevenLabs、OpenAI、Cartesia、Fish Audioはすべて同じ読み上げボタンで使えます。",
+  "Allow approvals": "承認を許可",
+  "Allow approvals for {name}": "{name}の承認を許可",
+  "Bot access is granted separately.": "ボットへのアクセスは別途付与されます。",
+  "Bot connections and credentials are removed; routines are paused. Replies use the new owner’s model connection.":
+    "ボットの接続と認証情報は削除され、ルーティンは一時停止されます。返信は新しいオーナーのモデル接続を使用します。",
+  "Choose member": "メンバーを選択",
+  Company: "会社",
+  "Company member": "会社メンバー",
+  "Copy invitation": "招待をコピー",
+  "Invitation code": "招待コード",
+  "Invite member": "メンバーを招待",
+  "Join company": "会社に参加",
+  "Members can read all past and future messages and use this bot’s memory. Sharing permanently disables tools. Replies use the owner’s model connection.":
+    "メンバーは過去と今後のすべてのメッセージを読み、このボットのメモリを使用できます。共有するとツールは完全に無効になります。返信はオーナーのモデル接続を使用します。",
+  "Open company": "会社を開く",
+  "Preview invitation": "招待をプレビュー",
+  "Revoke invitation": "招待を取り消す",
+  Sharing: "共有",
+  "Sharing requires a private computer.": "共有にはプライベートコンピューターが必要です。",
+  Transfer: "譲渡",
+  "Transfer ownership": "所有権を譲渡",
+  "Transfer ownership to {name}": "{name}に所有権を譲渡",
+  "Transfer ownership to {name}?": "{name}に所有権を譲渡しますか？",
+  "Use private computer": "プライベートコンピューターを使用",
 };

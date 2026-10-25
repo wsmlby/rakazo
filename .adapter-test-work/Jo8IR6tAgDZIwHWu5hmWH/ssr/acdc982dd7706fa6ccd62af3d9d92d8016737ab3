@@ -1,9 +1,0 @@
-__vite_ssr_exportName__("instructionUpdateDiff", () => { try { return instructionUpdateDiff } catch {} });
-/** A full replacement diff keeps every removed constraint visible during approval. */
-function instructionUpdateDiff(before, after, reason) {
-	return `${reason}\n\n${before.split("\n").map((line) => `- ${line}`).join("\n")}\n${after.split("\n").map((line) => `+ ${line}`).join("\n")}`;
-}
-//# sourceMappingSource=vite-generated
-//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7QUFDTyxTQUFTLHNCQUFzQixRQUFnQixPQUFlLFFBQXdCO0NBQzNGLE9BQU8sR0FBRyxPQUFPLE1BQU0sT0FDcEIsTUFBTSxJQUFJLENBQUMsQ0FDWCxLQUFLLFNBQVMsS0FBSyxNQUFNLENBQUMsQ0FDMUIsS0FBSyxJQUFJLEVBQUUsSUFBSSxNQUNmLE1BQU0sSUFBSSxDQUFDLENBQ1gsS0FBSyxTQUFTLEtBQUssTUFBTSxDQUFDLENBQzFCLEtBQUssSUFBSTtBQUNkIiwibmFtZXMiOltdLCJpZ25vcmVMaXN0IjpbXSwic291cmNlcyI6WyJpbnN0cnVjdGlvbi1kaWZmLnRzIl0sInNvdXJjZXNDb250ZW50IjpbIi8qKiBBIGZ1bGwgcmVwbGFjZW1lbnQgZGlmZiBrZWVwcyBldmVyeSByZW1vdmVkIGNvbnN0cmFpbnQgdmlzaWJsZSBkdXJpbmcgYXBwcm92YWwuICovXG5leHBvcnQgZnVuY3Rpb24gaW5zdHJ1Y3Rpb25VcGRhdGVEaWZmKGJlZm9yZTogc3RyaW5nLCBhZnRlcjogc3RyaW5nLCByZWFzb246IHN0cmluZyk6IHN0cmluZyB7XG4gIHJldHVybiBgJHtyZWFzb259XFxuXFxuJHtiZWZvcmVcbiAgICAuc3BsaXQoXCJcXG5cIilcbiAgICAubWFwKChsaW5lKSA9PiBgLSAke2xpbmV9YClcbiAgICAuam9pbihcIlxcblwiKX1cXG4ke2FmdGVyXG4gICAgLnNwbGl0KFwiXFxuXCIpXG4gICAgLm1hcCgobGluZSkgPT4gYCsgJHtsaW5lfWApXG4gICAgLmpvaW4oXCJcXG5cIil9YDtcbn1cbiJdLCJmaWxlIjoiL3BhY2thZ2VzL2NvcmUvc3JjL2luc3RydWN0aW9uLWRpZmYudHMifQ==
-
-//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvY29yZS9zcmMvaW5zdHJ1Y3Rpb24tZGlmZi50cyIsIi9wYWNrYWdlcy9jb3JlL3NyYy9pbnN0cnVjdGlvbi1kaWZmLnRzIixbXV0=

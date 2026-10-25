@@ -186,8 +186,7 @@ export async function provisionComputer(
       : {};
   if (
     context.collaborationRestricted &&
-    (!context.botId ||
-      (await deps.sandbox.provisionKind?.()) === "desktop")
+    (!context.botId || (await deps.sandbox.provisionKind?.()) === "desktop")
   )
     throw new Error("Shared bot computer access is no longer valid.");
   const initial = context.collaborationRestricted
