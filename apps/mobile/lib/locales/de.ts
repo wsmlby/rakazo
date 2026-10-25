@@ -1014,4 +1014,19 @@ export const DE_MESSAGES: Record<string, string> = {
   "How big is your team?": "Wie groß ist dein Team?",
   "How did you hear about us?": "Wie hast du von uns erfahren?",
   "Welcome to Rakazo": "Willkommen bei Rakazo",
+  "Allow approvals": "Freigaben erlauben",
+  "Allow approvals for {name}": "Freigaben für {name} erlauben",
+  "Bot access is granted separately.": "Der Bot-Zugriff wird separat gewährt.",
+  "Bot connections and credentials are removed; routines are paused. Replies use the new owner’s model connection.":
+    "Bot-Verbindungen und Zugangsdaten werden entfernt; Routinen werden pausiert. Antworten nutzen die Modellverbindung des neuen Eigentümers.",
+  "Choose member": "Mitglied wählen",
+  "Members can read all past and future messages and use this bot’s memory. Sharing permanently disables tools. Replies use the owner’s model connection.":
+    "Mitglieder können alle vergangenen und künftigen Nachrichten lesen und das Gedächtnis dieses Bots nutzen. Durch das Teilen werden Tools dauerhaft deaktiviert. Antworten nutzen die Modellverbindung des Eigentümers.",
+  Sharing: "Teilen",
+  "Sharing requires a private computer.": "Zum Teilen ist ein privater Computer erforderlich.",
+  Transfer: "Übertragen",
+  "Transfer ownership": "Eigentum übertragen",
+  "Transfer ownership to {name}": "Eigentum an {name} übertragen",
+  "Transfer ownership to {name}?": "Eigentum an {name} übertragen?",
+  "Use private computer": "Privaten Computer verwenden",
 };

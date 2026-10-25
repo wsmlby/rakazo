@@ -5,7 +5,7 @@ import type {
   ConnectorProvider,
   ConnectorTool,
 } from "@rakazo/adapter-kit";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ConnectorRegistry, createConnectorStack } from "./composio-connector.js";
 
 class StubConnector implements ConnectorProvider {
@@ -44,6 +44,36 @@ const context: AdapterContext = {
 };
 
 describe("ConnectorRegistry", () => {
+  it("never discovers, resolves, or executes owner-wide providers for shared bots", async () => {
+    const personal = new StubConnector("installed", [tool("private_tool")]);
+    const discoverPersonal = vi.spyOn(personal, "discoverTools");
+    const mcp = new StubConnector("mcp", [tool("assigned_tool")]);
+    const discoverMcp = vi.spyOn(mcp, "discoverTools");
+    const registry = new ConnectorRegistry([personal, mcp]);
+    const sharedContext = { ...context, botId: "bot-1", collaborationRestricted: true };
+    const tools = await registry.discoverTools(sharedContext);
+    expect(tools).toEqual([]);
+    expect(discoverPersonal).not.toHaveBeenCalled();
+    expect(discoverMcp).not.toHaveBeenCalled();
+    const call = {
+      tool: "private_tool",
+      args: {},
+      executionId: "call-1",
+      route: { connectorId: "installed", toolName: "private_tool" },
+    };
+    const events = [];
+    for await (const event of registry.execute(call, sharedContext)) events.push(event);
+    expect(events).toEqual([{ type: "error", message: expect.any(String) }]);
+    expect(personal.calls).toEqual([]);
+    await expect(registry.resolveCall(call, sharedContext)).rejects.toThrow();
+    for await (const _event of registry.execute(
+      { ...call, tool: "assigned_tool", route: { connectorId: "mcp", toolName: "assigned_tool" } },
+      sharedContext,
+    )) {
+      /* drain */
+    }
+    expect(mcp.calls).toHaveLength(0);
+  });
   it("preserves every colliding tool and routes through hidden source metadata", async () => {
     const first = new StubConnector("first", [tool("shared.tool")]);
     const second = new StubConnector("second", [tool("shared.tool")]);

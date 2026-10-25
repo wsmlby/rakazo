@@ -10,7 +10,7 @@ import {
 } from "@rakazo/adapters";
 import type { Actor, AiConsentQuery, AiConsentStatus, AiRecipient } from "@rakazo/contracts";
 import { AI_DISCLOSURE_VERSION, AI_PRIVACY_URL } from "@rakazo/contracts";
-import { findDefaultVoiceCredential, findModelCredential } from "@rakazo/db";
+import { findDefaultVoiceCredential, findModelCredential, runAsTenant } from "@rakazo/db";
 import type { RouterDeps } from "./router.js";
 import { resolveThreadTarget } from "./thread-target.js";
 import { voiceCredentialServer } from "./voice.js";
@@ -24,6 +24,11 @@ export async function aiConsentStatus(
   const modelsEnabled = uses.includes("model") && deps.env.agentRuntime !== "scripted";
   const target =
     query.botId || query.groupId ? await resolveThreadTarget(deps.prisma, actor, query) : null;
+  // Authorization and consent belong to the viewer; execution uses the bot owner's models.
+  const modelScope = {
+    userId: target?.kind === "bot" ? target.bot.userId : actor.userId,
+    spaceId: actor.spaceId,
+  };
   const botIds = target
     ? target.kind === "bot"
       ? [target.botId]
@@ -32,49 +37,57 @@ export async function aiConsentStatus(
   const [preferences, roleChoices, main, bots, routines, voices, memory, settings, consents] =
     await Promise.all([
       modelsEnabled
-        ? deps.prisma.spaceModelPreference.findMany({
-            where: { userId: actor.userId, spaceId: actor.spaceId },
-            include: { credential: true },
-          })
+        ? runAsTenant(modelScope, () =>
+            deps.prisma.spaceModelPreference.findMany({
+              where: modelScope,
+              include: { credential: true },
+            }),
+          )
         : [],
       modelsEnabled
-        ? deps.prisma.spaceModelRoleChoice.findMany({
-            where: { userId: actor.userId, spaceId: actor.spaceId },
-            orderBy: [{ role: "asc" }, { position: "asc" }],
-          })
+        ? runAsTenant(modelScope, () =>
+            deps.prisma.spaceModelRoleChoice.findMany({
+              where: modelScope,
+              orderBy: [{ role: "asc" }, { position: "asc" }],
+            }),
+          )
         : [],
       modelsEnabled
-        ? resolveMemberMainModel({ prisma: deps.prisma, secretStore: deps.secrets }, actor)
+        ? runAsTenant(modelScope, () =>
+            resolveMemberMainModel({ prisma: deps.prisma, secretStore: deps.secrets }, modelScope),
+          )
         : null,
       modelsEnabled
-        ? deps.prisma.bot.findMany({
-            where: {
-              userId: actor.userId,
-              spaceId: actor.spaceId,
-              archivedAt: null,
-              ...(botIds ? { id: { in: botIds } } : {}),
-            },
-            select: { modelProvider: true, modelId: true, thinkingLevel: true },
-          })
+        ? runAsTenant(modelScope, () =>
+            deps.prisma.bot.findMany({
+              where: {
+                ...modelScope,
+                archivedAt: null,
+                ...(botIds ? { id: { in: botIds } } : {}),
+              },
+              select: { modelProvider: true, modelId: true, thinkingLevel: true },
+            }),
+          )
         : [],
       // An active routine with its own model is another recipient for this bot.
       // A paused routine is included only when this check is for that routine,
       // so it does not block an ordinary chat message.
       modelsEnabled
-        ? deps.prisma.routine.findMany({
-            where: {
-              userId: actor.userId,
-              spaceId: actor.spaceId,
-              modelProvider: { not: null },
-              modelId: { not: null },
-              bot: { archivedAt: null },
-              ...(botIds ? { botId: { in: botIds } } : {}),
-              OR: query.routineId
-                ? [{ active: true }, { id: query.routineId }]
-                : [{ active: true }],
-            },
-            select: { modelProvider: true, modelId: true, thinkingLevel: true },
-          })
+        ? runAsTenant(modelScope, () =>
+            deps.prisma.routine.findMany({
+              where: {
+                ...modelScope,
+                modelProvider: { not: null },
+                modelId: { not: null },
+                bot: { archivedAt: null },
+                ...(botIds ? { botId: { in: botIds } } : {}),
+                OR: query.routineId
+                  ? [{ active: true }, { id: query.routineId }]
+                  : [{ active: true }],
+              },
+              select: { modelProvider: true, modelId: true, thinkingLevel: true },
+            }),
+          )
         : [],
       uses.includes("voice")
         ? query.uses
@@ -103,114 +116,122 @@ export async function aiConsentStatus(
       recipients.set(recipient.key, { ...recipient, allowed: allowed.has(recipient.key) });
   };
   if (modelsEnabled) {
-    const deployment = deps.env.deploymentModelConfigured
-      ? { provider: deps.env.defaultProvider, model: deps.env.defaultModel }
-      : null;
-    const selected = await Promise.all(
-      (target ? [...bots, ...routines] : [null, ...bots, ...routines]).map(async (override) => {
-        const overrideCredential =
-          override?.modelProvider && override.modelId
-            ? await findModelCredential(
-                deps.prisma,
-                actor,
-                override.modelProvider,
-                override.modelId,
-              )
-            : null;
-        return selectConfiguredModel({
-          override,
-          overrideCredential,
-          main,
-          hostedProvider: deps.billing?.modelCreditsEnabled ? deps.env.defaultProvider : undefined,
-          defaults: { settings, deployment },
-        });
-      }),
-    );
-    // Connected models remain reachable by helpers during a targeted bot run.
-    for (const preference of preferences)
-      selected.push({
-        provider: preference.credential.provider,
-        id: preference.modelId ?? "",
-        credential: {
-          ...preference.credential,
-          isDefault: preference.isDefault,
-          defaultModel: preference.modelId,
-          thinkingLevel: preference.thinkingLevel,
-        },
-        thinkingLevel: null,
-      });
-    // Every purpose's models, fallbacks included, can receive a run's content.
-    const roleModels = await Promise.all(
-      roleChoices.map(async (choice) => {
-        const credential = await findModelCredential(
-          deps.prisma,
-          actor,
-          choice.provider,
-          choice.modelId,
-        );
-        return credential
-          ? { provider: choice.provider, id: choice.modelId, credential, thinkingLevel: null }
-          : null;
-      }),
-    );
-    selected.push(...roleModels.filter((model) => model !== null));
-    if (deps.env.teamChatJudgeProvider && deps.env.teamChatJudgeModel) {
-      selected.push({
-        provider: deps.env.teamChatJudgeProvider,
-        id: deps.env.teamChatJudgeModel,
-        credential: await findModelCredential(
-          deps.prisma,
-          actor,
-          deps.env.teamChatJudgeProvider,
-          deps.env.teamChatJudgeModel,
-        ),
-        thinkingLevel: null,
-      });
-    }
-    const models = [
-      ...new Map(
-        selected
-          .filter((model) => model.provider)
-          .map((model) => [
-            JSON.stringify([model.provider, model.id, model.credential?.secretId]),
-            model,
-          ]),
-      ).values(),
-    ];
-    const secrets = models.length
-      ? await deps.prisma.secret.findMany({
-          where: {
-            userId: actor.userId,
-            spaceId: null,
-            id: {
-              in: models.flatMap((model) => (model.credential ? [model.credential.secretId] : [])),
-            },
-          },
-        })
-      : [];
-    const baseUrls = new Map(
-      await Promise.all(
-        secrets.map(async (secret): Promise<[string, string | undefined]> => {
-          try {
-            const parsed = parseModelSecret(await deps.secrets.load(secret.ciphertext, secret.id));
-            return [secret.id, parsed.kind === "openai_compatible" ? parsed.baseUrl : undefined];
-          } catch {
-            // Unreadable credentials still disclose by provider; the base URL is unknown.
-            return [secret.id, undefined];
-          }
-        }),
-      ),
-    );
-    for (const model of models) {
-      add(
-        aiRecipient({
-          provider: model.provider!,
-          modelId: model.id!,
-          baseUrl: model.credential ? baseUrls.get(model.credential.secretId) : undefined,
-          use: "model",
+    await runAsTenant(modelScope, async () => {
+      const deployment = deps.env.deploymentModelConfigured
+        ? { provider: deps.env.defaultProvider, model: deps.env.defaultModel }
+        : null;
+      const selected = await Promise.all(
+        (target ? [...bots, ...routines] : [null, ...bots, ...routines]).map(async (override) => {
+          const overrideCredential =
+            override?.modelProvider && override.modelId
+              ? await findModelCredential(
+                  deps.prisma,
+                  modelScope,
+                  override.modelProvider,
+                  override.modelId,
+                )
+              : null;
+          return selectConfiguredModel({
+            override,
+            overrideCredential,
+            main,
+            hostedProvider: deps.billing?.modelCreditsEnabled
+              ? deps.env.defaultProvider
+              : undefined,
+            defaults: { settings, deployment },
+          });
         }),
       );
-    }
+      // Connected models remain reachable by helpers during a targeted bot run.
+      for (const preference of preferences)
+        selected.push({
+          provider: preference.credential.provider,
+          id: preference.modelId ?? "",
+          credential: {
+            ...preference.credential,
+            isDefault: preference.isDefault,
+            defaultModel: preference.modelId,
+            thinkingLevel: preference.thinkingLevel,
+          },
+          thinkingLevel: null,
+        });
+      // Every purpose's models, fallbacks included, can receive a run's content.
+      const roleModels = await Promise.all(
+        roleChoices.map(async (choice) => {
+          const credential = await findModelCredential(
+            deps.prisma,
+            modelScope,
+            choice.provider,
+            choice.modelId,
+          );
+          return credential
+            ? { provider: choice.provider, id: choice.modelId, credential, thinkingLevel: null }
+            : null;
+        }),
+      );
+      selected.push(...roleModels.filter((model) => model !== null));
+      if (deps.env.teamChatJudgeProvider && deps.env.teamChatJudgeModel) {
+        selected.push({
+          provider: deps.env.teamChatJudgeProvider,
+          id: deps.env.teamChatJudgeModel,
+          credential: await findModelCredential(
+            deps.prisma,
+            modelScope,
+            deps.env.teamChatJudgeProvider,
+            deps.env.teamChatJudgeModel,
+          ),
+          thinkingLevel: null,
+        });
+      }
+      const models = [
+        ...new Map(
+          selected
+            .filter((model) => model.provider)
+            .map((model) => [
+              JSON.stringify([model.provider, model.id, model.credential?.secretId]),
+              model,
+            ]),
+        ).values(),
+      ];
+      const secrets = models.length
+        ? await deps.prisma.secret.findMany({
+            where: {
+              userId: modelScope.userId,
+              spaceId: null,
+              id: {
+                in: models.flatMap((model) =>
+                  model.credential ? [model.credential.secretId] : [],
+                ),
+              },
+            },
+          })
+        : [];
+      const baseUrls = new Map(
+        await Promise.all(
+          secrets.map(async (secret): Promise<[string, string | undefined]> => {
+            try {
+              const parsed = parseModelSecret(
+                await deps.secrets.load(secret.ciphertext, secret.id),
+              );
+              return [secret.id, parsed.kind === "openai_compatible" ? parsed.baseUrl : undefined];
+            } catch {
+              // Unreadable credentials still disclose by provider; the base URL is unknown.
+              return [secret.id, undefined];
+            }
+          }),
+        ),
+      );
+      for (const model of models) {
+        add(
+          aiRecipient({
+            provider: model.provider!,
+            modelId: model.id!,
+            baseUrl: model.credential ? baseUrls.get(model.credential.secretId) : undefined,
+            use: "model",
+          }),
+        );
+      }
+    });
   }
   for (const voice of voices) {
     // A self-hosted server is disclosed by its own origin, like a custom model endpoint.
@@ -252,9 +273,9 @@ export async function aiConsentStatus(
 export async function allowAiConsent(
   deps: RouterDeps,
   actor: Actor,
-  input: { scope: string; version: string; keys: string[] },
+  input: { scope: string; version: string; keys: string[]; query?: AiConsentQuery },
 ) {
-  const current = await aiConsentStatus(deps, actor);
+  const current = await aiConsentStatus(deps, actor, input.query);
   const known = new Set(current.recipients.map((recipient) => recipient.key));
   if (
     input.scope !== current.scope ||

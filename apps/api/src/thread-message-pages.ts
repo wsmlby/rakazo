@@ -27,12 +27,15 @@ export async function loadMessagePage(
   around?: { messageId?: string; seq?: number },
   includePeerRuns = false,
   includePeerReceipts = false,
+  /** Whose private exchange to read: a collaborator's id, or null for the owner's own thread. Omit for every message. */
+  audienceUserId?: string | null,
 ): Promise<ThreadMessagePage> {
+  const audience = audienceUserId === undefined ? {} : { audienceUserId };
   if (around) {
     let targetSeq = around.seq;
     if (targetSeq === undefined && around.messageId) {
       const row = await prisma.message.findFirst({
-        where: { id: around.messageId, threadId },
+        where: { id: around.messageId, threadId, ...audience },
         select: { seq: true },
       });
       targetSeq = row?.seq;
@@ -42,7 +45,7 @@ export async function loadMessagePage(
       const minSeq = Math.max(0, targetSeq - half);
       const maxSeq = targetSeq + half;
       const rows = await prisma.message.findMany({
-        where: { threadId, seq: { gte: minSeq, lte: maxSeq } },
+        where: { threadId, ...audience, seq: { gte: minSeq, lte: maxSeq } },
         orderBy: { seq: "asc" },
         take: pageSize,
         include: { replyTo: { select: replySelection } },
@@ -51,7 +54,9 @@ export async function loadMessagePage(
       const coveredThroughSeq = truncated ? (rows[rows.length - 1]?.seq ?? maxSeq) : maxSeq;
       const first = rows[0];
       const hasOlder = first
-        ? (await prisma.message.count({ where: { threadId, seq: { lt: first.seq } } })) > 0
+        ? (await prisma.message.count({
+            where: { threadId, ...audience, seq: { lt: first.seq } },
+          })) > 0
         : false;
       // Peer activity stays out of the normal transcript (including the
       // around target). Full peer history belongs in the bot-messages overlay
@@ -71,6 +76,7 @@ export async function loadMessagePage(
     const rows = await prisma.message.findMany({
       where: {
         threadId,
+        ...audience,
         ...(cursor === undefined ? {} : { seq: { lt: cursor } }),
       },
       orderBy: { seq: "desc" },
@@ -253,6 +259,8 @@ function toThreadMessage(row: {
   threadId: string;
   seq: number;
   role: string;
+  authorUserId?: string | null;
+  authorName?: string | null;
   blocks: Prisma.JsonValue;
   botId: string | null;
   replyToMessageId: string | null;
@@ -284,6 +292,8 @@ function toThreadMessage(row: {
     threadId: row.threadId,
     seq: row.seq,
     role: row.role as ThreadMessage["role"],
+    authorUserId: row.authorUserId ?? undefined,
+    authorName: row.authorName ?? undefined,
     blocks: row.blocks as ThreadMessage["blocks"],
     botId: row.botId ?? undefined,
     replyToMessageId: row.replyToMessageId ?? undefined,
@@ -293,4 +303,38 @@ function toThreadMessage(row: {
     callId: callIdFromClientNonce(row.clientNonce),
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+/**
+ * The collaborator whose private exchange an event belongs to, or null for the owner's own
+ * thread. Run events follow the run's requester; message events follow the stored message.
+ */
+export async function eventAudienceUserId(
+  prisma: MessageDb,
+  event: { runId?: string; payload: Record<string, unknown> },
+  cache: Map<string, Promise<string | null>>,
+): Promise<string | null> {
+  const { runId } = event;
+  const messageId = typeof event.payload.messageId === "string" ? event.payload.messageId : null;
+  const key = runId ? `run:${runId}` : messageId ? `message:${messageId}` : null;
+  if (!key) return null;
+  let audience = cache.get(key);
+  if (!audience) {
+    audience = runId
+      ? prisma.run
+          .findUnique({ where: { id: runId }, select: { userId: true, requesterUserId: true } })
+          .then((run) =>
+            run?.requesterUserId && run.requesterUserId !== run.userId ? run.requesterUserId : null,
+          )
+      : prisma.message
+          .findUnique({ where: { id: messageId! }, select: { audienceUserId: true } })
+          .then((message) => message?.audienceUserId ?? null);
+    cache.set(key, audience);
+  }
+  return audience;
+}
+
+/** Owners keep run lifecycle and takeover signals; a collaborator's content stays in their own exchange. */
+export function ownerSeesCollaboratorEvent(event: { type: string }): boolean {
+  return event.type.startsWith("run.") || event.type === "computer.takeover.requested";
 }

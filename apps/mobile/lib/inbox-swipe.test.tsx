@@ -160,6 +160,12 @@ afterEach(() => {
 });
 
 describe("inbox row actions", () => {
+  it("keeps personal row actions without archive for collaborators", () => {
+    expect(inboxRowActionList({ unread: true, pinned: false, accessRole: "collaborator" })).toEqual(
+      ["read", "pin"],
+    );
+  });
+
   it.each([
     [{ unread: true, pinned: false }, "read", ["archive", "pin"]],
     [{ unread: false, pinned: false }, "unread", ["archive", "pin"]],

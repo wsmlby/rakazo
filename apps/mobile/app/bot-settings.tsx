@@ -41,6 +41,11 @@ import { NativeSwitch } from "../components/native-switch";
 import { NativeSymbol } from "../components/native-symbol";
 import { ProfileEditDialog } from "../components/profile-edit-dialog";
 import { Chevron } from "../components/row-accessories";
+import {
+  SettingsGroup as NativeSettingsGroup,
+  SettingsRow,
+  SettingsSwitch,
+} from "../components/settings-group";
 import type { MobileBot, MobileMe, MobileModel, MobileModelCredential } from "../lib/api";
 import { rpc } from "../lib/api";
 import {
@@ -79,6 +84,8 @@ export default function BotSettingsScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const modelY = useRef(0);
   const [bot, setBot] = useState<BotSettingsRecord | null>(null);
+  const loadedComputerMode = useRef<ComputerMode | undefined>(undefined);
+  const focusedOnce = useRef(false);
   const [name, setName] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -171,6 +178,7 @@ export default function BotSettingsScreen() {
         setInstructions(next.instructions ?? "");
         setColor(next.color);
         setComputerMode(next.computerMode);
+        loadedComputerMode.current = next.computerMode;
         setModelKey(
           next.modelProvider && next.modelId
             ? modelOptionKey(next.modelProvider, next.modelId)
@@ -186,6 +194,29 @@ export default function BotSettingsScreen() {
       })
       .catch((err) => setError(errorText(err, t("Could not load bot"))));
   }, [botId, crossSpaceSave, fleetSave, notifySave, profileSaves]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!focusedOnce.current) {
+        focusedOnce.current = true;
+        return;
+      }
+      let current = true;
+      void rpc<BotSettingsRecord>("bots/get", { botId })
+        .then((next) => {
+          if (!current) return;
+          setBot(next);
+          if (next.computerMode !== loadedComputerMode.current) setComputerMode(next.computerMode);
+          loadedComputerMode.current = next.computerMode;
+        })
+        .catch((cause) => {
+          if (current) setError(errorText(cause));
+        });
+      return () => {
+        current = false;
+      };
+    }, [botId]),
+  );
 
   useEffect(() => {
     void Promise.all([
@@ -489,6 +520,45 @@ export default function BotSettingsScreen() {
     voiceRowContent
   );
 
+  if (!bot) {
+    return (
+      <>
+        <Stack.Screen options={glassHeaderOptions(t("Chat settings"))} />
+        {error ? (
+          <Text accessibilityRole="alert" style={{ color: tokens.destructive }}>
+            {error}
+          </Text>
+        ) : null}
+      </>
+    );
+  }
+
+  if (bot.accessRole === "collaborator") {
+    return (
+      <>
+        <Stack.Screen options={glassHeaderOptions(t("Chat settings"))} />
+        <ScrollView
+          style={[{ flex: 1, backgroundColor: tokens.background }, sideInsets]}
+          contentContainerStyle={{ padding: 24 }}
+          contentInsetAdjustmentBehavior="automatic"
+        >
+          <NativeSettingsGroup>
+            <SettingsSwitch
+              label={t("Notifications")}
+              value={notifyOnFinish}
+              onChange={(value) => notifySave.update(value)}
+            />
+          </NativeSettingsGroup>
+          {error ? (
+            <Text accessibilityRole="alert" style={{ color: tokens.destructive }}>
+              {error}
+            </Text>
+          ) : null}
+        </ScrollView>
+      </>
+    );
+  }
+
   return (
     <>
       <Stack.Screen options={glassHeaderOptions(t("Chat settings"))} />
@@ -548,6 +618,16 @@ export default function BotSettingsScreen() {
           />
         </View>
         <View style={{ marginTop: 16 }}>
+          {bot ? (
+            <NativeSettingsGroup>
+              <SettingsRow
+                title={t("Sharing")}
+                accessibilityRole="button"
+                chevron="right"
+                onPress={() => router.push({ pathname: "/bot-sharing", params: { botId } })}
+              />
+            </NativeSettingsGroup>
+          ) : null}
           <View>
             <View
               style={{
@@ -699,9 +779,11 @@ export default function BotSettingsScreen() {
               </Text>
             ) : null}
 
-            <SettingsGroup label={t("Computer")}>
-              <ComputerModePicker plain value={computerMode} onChange={setComputerMode} />
-            </SettingsGroup>
+            {!bot.collaborationRestricted ? (
+              <SettingsGroup label={t("Computer")}>
+                <ComputerModePicker plain value={computerMode} onChange={setComputerMode} />
+              </SettingsGroup>
+            ) : null}
             <SettingsGroup label={t("Voice")}>
               <View style={styles.row}>
                 <Text style={[styles.rowLabel, { color: tokens.foreground }]}>
@@ -728,43 +810,48 @@ export default function BotSettingsScreen() {
                 )
               ) : null}
             </SettingsGroup>
-            <SettingsGroup label={t("Permissions")}>
-              <View style={styles.row}>
-                <Text style={[styles.rowLabel, { color: tokens.foreground }]}>
-                  {t("Allow cross-space bot communication")}
-                </Text>
-                <NativeSwitch
-                  accessibilityLabel={t("Allow cross-space bot communication")}
-                  value={crossSpaceCommunication}
-                  onValueChange={(value) => {
-                    if (!botId) return;
-                    setError(null);
-                    crossSpaceSave.update(value);
-                  }}
-                />
-              </View>
-              <View style={styles.row}>
-                <View style={{ gap: 4, flex: 1 }}>
-                  <Text
-                    style={[styles.rowLabel, { color: tokens.foreground, flex: 0, flexShrink: 1 }]}
-                  >
-                    {t("Manage the bots it creates")}
+            {!bot.collaborationRestricted ? (
+              <SettingsGroup label={t("Permissions")}>
+                <View style={styles.row}>
+                  <Text style={[styles.rowLabel, { color: tokens.foreground }]}>
+                    {t("Allow cross-space bot communication")}
                   </Text>
-                  <Text style={{ color: tokens.mutedForeground, fontSize: 12 }}>
-                    {t("Can edit and organise bots it creates")}
-                  </Text>
+                  <NativeSwitch
+                    accessibilityLabel={t("Allow cross-space bot communication")}
+                    value={crossSpaceCommunication}
+                    onValueChange={(value) => {
+                      if (!botId) return;
+                      setError(null);
+                      crossSpaceSave.update(value);
+                    }}
+                  />
                 </View>
-                <NativeSwitch
-                  accessibilityLabel={t("Manage the bots it creates")}
-                  onValueChange={(value) => {
-                    if (!botId) return;
-                    setError(null);
-                    fleetSave.update(value);
-                  }}
-                  value={fleetManagement}
-                />
-              </View>
-            </SettingsGroup>
+                <View style={styles.row}>
+                  <View style={{ gap: 4, flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.rowLabel,
+                        { color: tokens.foreground, flex: 0, flexShrink: 1 },
+                      ]}
+                    >
+                      {t("Manage the bots it creates")}
+                    </Text>
+                    <Text style={{ color: tokens.mutedForeground, fontSize: 12 }}>
+                      {t("Can edit and organise bots it creates")}
+                    </Text>
+                  </View>
+                  <NativeSwitch
+                    accessibilityLabel={t("Manage the bots it creates")}
+                    onValueChange={(value) => {
+                      if (!botId) return;
+                      setError(null);
+                      fleetSave.update(value);
+                    }}
+                    value={fleetManagement}
+                  />
+                </View>
+              </SettingsGroup>
+            ) : null}
             <SettingsGroup label={t("Description")}>
               <Text style={{ color: tokens.mutedForeground, fontSize: 12 }}>
                 {t("How other bots see it")}

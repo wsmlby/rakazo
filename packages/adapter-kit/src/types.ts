@@ -10,6 +10,8 @@ export interface AdapterContext {
   spaceId: string;
   userId: string;
   botId?: string;
+  /** Only this bot's explicitly assigned resources may be used, never user-wide defaults. */
+  collaborationRestricted?: boolean;
   runId?: string;
   /** Opaque fence for releasing a graphical screen without tearing down its replacement. */
   screenLeaseId?: string;

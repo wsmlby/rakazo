@@ -31,6 +31,8 @@ export function loadRunHistoryMessages(
       threadId: true,
       seq: true,
       role: true,
+      authorUserId: true,
+      authorName: true,
       botId: true,
       runId: true,
       blocks: true,
@@ -55,6 +57,8 @@ export function isPartialReplyClientNonce(clientNonce: string | null | undefined
 export interface CreateThreadMessageInput {
   threadId: string;
   role: "user" | "bot" | "system";
+  authorUserId?: string;
+  authorName?: string;
   blocks: MessageBlock[];
   botId?: string;
   replyToMessageId?: string;
@@ -84,14 +88,26 @@ export async function createThreadMessageInTransaction(
       nextMessageSeq: { increment: 1 },
       unread: (input.markUnread ?? input.role === "bot") ? true : undefined,
     },
-    select: { nextMessageSeq: true },
+    select: { nextMessageSeq: true, userId: true },
   });
-  await assertRunCanWriteHistory(tx, input.runId, { allowCancelled: input.allowCancelledRun });
+  const run = await assertRunCanWriteHistory(tx, input.runId, {
+    allowCancelled: input.allowCancelledRun,
+  });
+  // A collaborator's messages, and the bot's replies to their runs, are a private exchange.
+  const audienceUserId =
+    input.authorUserId && input.authorUserId !== thread.userId
+      ? input.authorUserId
+      : run?.requesterUserId && run.requesterUserId !== run.userId
+        ? run.requesterUserId
+        : null;
   return tx.message.create({
     data: {
       threadId: input.threadId,
       seq: thread.nextMessageSeq - 1,
       role: input.role,
+      authorUserId: input.authorUserId,
+      authorName: input.authorName,
+      audienceUserId,
       blocks: input.blocks as Prisma.InputJsonValue,
       botId: input.botId,
       replyToMessageId: input.replyToMessageId,
@@ -114,13 +130,25 @@ export async function assertRunCanWriteHistory(
   runId?: string,
   options?: { allowCancelled?: boolean },
 ): Promise<
-  | { status: string; startedAt: Date | null; firstResponseAt: Date | null; userId: string }
+  | {
+      status: string;
+      startedAt: Date | null;
+      firstResponseAt: Date | null;
+      userId: string;
+      requesterUserId: string | null;
+    }
   | undefined
 > {
   if (!runId) return;
   const run = await tx.run.findUnique({
     where: { id: runId },
-    select: { status: true, startedAt: true, firstResponseAt: true, userId: true },
+    select: {
+      status: true,
+      startedAt: true,
+      firstResponseAt: true,
+      userId: true,
+      requesterUserId: true,
+    },
   });
   if (!run || (run.status === "cancelled" && !options?.allowCancelled)) {
     throw new RunHistoryWriteError();

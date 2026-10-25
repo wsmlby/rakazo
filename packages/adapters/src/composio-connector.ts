@@ -513,6 +513,7 @@ export class ComposioConnector implements ComposioProvider {
   }
 
   async discoverTools(context: AdapterContext): Promise<ConnectorTool[]> {
+    if (context.collaborationRestricted) return [];
     const connections = connectedComposioConnections(context);
     if (connections.length === 0) return [];
     const { session } = await this.sessionForExecute(context.userId, connections);
@@ -521,6 +522,10 @@ export class ComposioConnector implements ComposioProvider {
   }
 
   async *execute(call: ConnectorCall, context: AdapterContext): AsyncIterable<ConnectorEvent> {
+    if (context.collaborationRestricted) {
+      yield { type: "error", message: "Owner-wide connectors are unavailable to shared bots." };
+      return;
+    }
     const executed = [];
     try {
       const { session, reconnect } = await this.sessionForExecute(
@@ -823,6 +828,7 @@ export class ConnectorRegistry implements ConnectorProvider {
   }
 
   async discoverTools(context: AdapterContext): Promise<ConnectorTool[]> {
+    if (context.collaborationRestricted) return [];
     const discovered: ConnectorTool[] = [];
     const used = new Set<string>();
     const providerTools = await Promise.all(
@@ -859,6 +865,10 @@ export class ConnectorRegistry implements ConnectorProvider {
 
   async *execute(call: ConnectorCall, context: AdapterContext): AsyncIterable<ConnectorEvent> {
     const connectorId = call.route?.connectorId ?? "composio";
+    if (context.collaborationRestricted) {
+      yield { type: "error", message: "Connector execution is not bot-isolated for shared bots." };
+      return;
+    }
     const provider = this.providers.get(connectorId);
     if (!provider) {
       yield { type: "error", message: `unknown connector ${connectorId}` };
@@ -873,6 +883,8 @@ export class ConnectorRegistry implements ConnectorProvider {
   ): Promise<{ call: ConnectorCall; tool: ConnectorTool } | undefined> {
     const connectorId = call.route?.connectorId;
     if (!connectorId) return undefined;
+    if (context.collaborationRestricted)
+      throw new Error("Connector execution is not bot-isolated for shared bots.");
     const provider = this.providers.get(connectorId);
     return provider?.resolveCall?.({ ...call, tool: call.route?.toolName ?? call.tool }, context);
   }

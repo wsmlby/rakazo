@@ -718,6 +718,7 @@ async function commitAnswerRunInput(
     select: {
       botId: true,
       userId: true,
+      requesterUserId: true,
       checkpoint: true,
       trigger: true,
       task: { select: { prompt: true } },
@@ -740,6 +741,23 @@ async function commitAnswerRunInput(
   if (pendingAsk?.kind !== "ask") return null;
   const approvalAsk = isApprovalAskBlock(pendingAsk);
   const secretAsk = isSecretAskBlock(pendingAsk);
+  if (run.requesterUserId && run.userId !== input.answeredByUserId) {
+    const membership = await tx.botCollaborator.findFirst({
+      where: {
+        botId: run.botId,
+        userId: input.answeredByUserId,
+        spaceId: input.spaceId,
+        bot: { space: { memberships: { some: { userId: input.answeredByUserId } } } },
+      },
+    });
+    if (
+      !membership ||
+      secretAsk ||
+      pendingAsk.instructionUpdate ||
+      (approvalAsk && (!membership.canApprove || input.answer === "always"))
+    )
+      return null;
+  }
   const choiceAsk = !approvalAsk && !secretAsk && Boolean(pendingAsk.actions?.length);
   const selectedChoice = choiceAsk ? resolveAskChoice(input.answer, pendingAsk.actions) : undefined;
   const dismissed = Boolean(input.dismiss);

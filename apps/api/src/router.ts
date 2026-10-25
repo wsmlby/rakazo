@@ -222,6 +222,7 @@ import {
   claimEmptySpaceDeletionForMember,
   commitBotUpdate,
   comparePreferenceOrder,
+  createBotSharing,
   createExternalConversationRepos,
   createGroupRepos,
   createRepos,
@@ -322,10 +323,12 @@ import { withSerializableRetry } from "./serializable-retry.js";
 
 import { assertTeachingSendAllowed, createTaughtSkillsService } from "./taught-skills.js";
 import {
+  eventAudienceUserId,
   isBackgroundRun,
   isPeerRun,
   loadAllMessages,
   loadMessagePage,
+  ownerSeesCollaboratorEvent,
   shouldForwardBackgroundThreadEvent,
   shouldForwardPeerThreadEvent,
 } from "./thread-message-pages.js";
@@ -2098,12 +2101,35 @@ export function createRouter(deps: RouterDeps) {
       }),
     },
     bots: {
-      list: authed.bots.list.handler(async ({ context }) => repos.listBots(context.actor)),
+      sharing: {
+        get: authed.bots.sharing.get.handler(({ context, input }) =>
+          createBotSharing(deps.prisma).get(context.actor, input.botId),
+        ),
+        grant: authed.bots.sharing.grant.handler(async ({ context, input }) => {
+          await createBotSharing(deps.prisma).grant(context.actor, input);
+          return { ok: true as const };
+        }),
+        revoke: authed.bots.sharing.revoke.handler(async ({ context, input }) => {
+          const revoked = await createBotSharing(deps.prisma).revoke(context.actor, input);
+          if (revoked.threadId && revoked.eventSeq !== null)
+            await deps.events.notify(revoked.threadId, revoked.eventSeq).catch(() => undefined);
+          return { ok: true as const };
+        }),
+        transfer: authed.bots.sharing.transfer.handler(async ({ context, input }) => {
+          await createBotSharing(deps.prisma).transfer(context.actor, input);
+          return { ok: true as const };
+        }),
+      },
+      list: authed.bots.list.handler(async ({ context }) =>
+        repos.listBots(context.actor, { accessible: true }),
+      ),
       listArchived: authed.bots.listArchived.handler(async ({ context }) =>
-        repos.listBots(context.actor, { archived: true }),
+        repos.listBots(context.actor, { archived: true, accessible: true }),
       ),
       get: authed.bots.get.handler(async ({ context, input }) => {
-        const found = (await repos.listBots(context.actor)).find((bot) => bot.id === input.botId);
+        const found = (await repos.listBots(context.actor, { accessible: true })).find(
+          (bot) => bot.id === input.botId,
+        );
         if (!found) throw new IsolationError();
         return found;
       }),
@@ -2164,6 +2190,57 @@ export function createRouter(deps: RouterDeps) {
         return { ok: true as const };
       }),
       update: authed.bots.update.handler(async ({ context, input }) => {
+        const preferenceKeys = new Set([
+          "botId",
+          "pinned",
+          "sectionId",
+          "notifyOnFinish",
+          "autoSpeak",
+        ]);
+        if (Object.keys(input).every((key) => preferenceKeys.has(key))) {
+          const bot = await repos.getAccessibleBot(context.actor, input.botId);
+          if (bot.collaborationRestricted) {
+            if (
+              input.sectionId &&
+              !(await deps.prisma.botSection.findFirst({
+                where: {
+                  id: input.sectionId,
+                  spaceId: context.actor.spaceId,
+                  userId: context.actor.userId,
+                },
+              }))
+            )
+              throw new IsolationError();
+            const data = {
+              pinned: input.pinned,
+              sectionId: input.sectionId,
+              notifyOnFinish: input.notifyOnFinish,
+              autoSpeak: input.autoSpeak,
+            };
+            await deps.prisma.botUserPreference.upsert({
+              where: { botId_userId: { botId: bot.id, userId: context.actor.userId } },
+              create: {
+                botId: bot.id,
+                spaceId: context.actor.spaceId,
+                userId: context.actor.userId,
+                ...(bot.userId === context.actor.userId
+                  ? {
+                      pinned: bot.pinned,
+                      sectionId: bot.sectionId,
+                      notifyOnFinish: bot.notifyOnFinish,
+                      autoSpeak: bot.autoSpeak,
+                      lastReadSeq: bot.thread?.lastReadSeq ?? -1,
+                    }
+                  : {}),
+                ...data,
+              },
+              update: data,
+            });
+            return (await repos.listBots(context.actor, { accessible: true })).find(
+              (item) => item.id === bot.id,
+            )!;
+          }
+        }
         const existing = await repos.getBot(context.actor, input.botId);
         if (input.sectionId) {
           const section = await deps.prisma.botSection.findFirst({
@@ -2274,6 +2351,8 @@ export function createRouter(deps: RouterDeps) {
       }),
       setComputer: authed.bots.setComputer.handler(async ({ context, input }) => {
         const bot = await repos.getBot(context.actor, input.botId);
+        if (bot.collaborationRestricted && input.mode !== "dedicated")
+          throw new ORPCError("FORBIDDEN", { message: "Shared bots require a dedicated computer" });
         if (!bot.computer) throw new IsolationError();
         const currentMode = bot.computer.scope === "dedicated" ? "dedicated" : "team";
         if (currentMode === input.mode) {
@@ -2604,12 +2683,18 @@ export function createRouter(deps: RouterDeps) {
           input.around,
           input.includePeerRuns,
           input.includePeerReceipts,
+          target.kind !== "bot"
+            ? undefined
+            : target.audienceUserId === null
+              ? (input.collaboratorUserId ?? null)
+              : target.audienceUserId,
         );
       }),
       subscribe: authed.threads.subscribe.handler(async function* ({ context, input }) {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         const peerRunCache = new Map<string, Promise<boolean>>();
         const backgroundRunCache = new Map<string, Promise<boolean>>();
+        const audienceCache = new Map<string, Promise<string | null>>();
         const follow = deps.events.follow(target.threadId, input.cursor, context.signal);
         // A half-open stream looks identical to an idle one, so punctuate silence:
         // the client treats any frame as liveness and reconnects once they stop.
@@ -2618,6 +2703,7 @@ export function createRouter(deps: RouterDeps) {
         // or revoked session stops within SESSION_RECHECK_MS, or at the next heartbeat when idle.
         let authorizedAt = Date.now();
         const assertStillAuthorized = async () => {
+          await resolveThreadTarget(deps.prisma, context.actor, input);
           if (!context.stillAuthorized || Date.now() - authorizedAt < SESSION_RECHECK_MS) return;
           if (!(await context.stillAuthorized())) throw new ORPCError("UNAUTHORIZED");
           authorizedAt = Date.now();
@@ -2653,6 +2739,14 @@ export function createRouter(deps: RouterDeps) {
             const event = next.value;
             // Filtered peer events also restart the heartbeat, so check before skipping them.
             await assertStillAuthorized();
+            if (target.kind === "bot") {
+              const audience = await eventAudienceUserId(deps.prisma, event, audienceCache);
+              if (target.audienceUserId !== null) {
+                if (audience !== target.audienceUserId) continue;
+              } else if (audience !== null && !ownerSeesCollaboratorEvent(event)) {
+                continue;
+              }
+            }
             if (await isPeerRun(deps.prisma, event.runId, peerRunCache)) {
               if (!shouldForwardPeerThreadEvent(event)) continue;
             } else if (await isBackgroundRun(deps.prisma, event.runId, backgroundRunCache)) {
@@ -2666,10 +2760,16 @@ export function createRouter(deps: RouterDeps) {
         }
       }),
       send: authed.threads.send.handler(async ({ context, input }) => {
-        if ((await modelSetup(deps, context.actor)).needsModel) {
+        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        const executionActor =
+          target.kind === "bot" && target.bot.userId !== context.actor.userId
+            ? { ...context.actor, userId: target.bot.userId, email: "", isDeploymentOwner: false }
+            : context.actor;
+        if (
+          (await runAsTenant(executionActor, () => modelSetup(deps, executionActor))).needsModel
+        ) {
           throw new ORPCError("BAD_REQUEST", { message: MODEL_REQUIRED_SEND_ERROR });
         }
-        const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         if (target.kind === "bot") {
           await assertTeachingSendAllowed(deps.prisma, context.actor.spaceId, target.botId);
         }
@@ -2685,6 +2785,8 @@ export function createRouter(deps: RouterDeps) {
       }),
       react: authed.threads.react.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind === "bot" && target.bot.collaborationRestricted)
+          throw new ORPCError("FORBIDDEN");
         // Without a model or while teaching, the reaction is still saved; it just starts no turn.
         const mayStartTurn =
           !(await modelSetup(deps, context.actor)).needsModel &&
@@ -2711,11 +2813,12 @@ export function createRouter(deps: RouterDeps) {
       }),
       stop: authed.threads.stop.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
-        await stopThreadRuns(deps, context.actor, target);
+        await stopThreadRuns(deps, context.actor, target, input.runId);
         return { ok: true as const };
       }),
       clear: authed.threads.clear.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind === "bot") await repos.getBot(context.actor, target.botId);
         const contextBotId = target.kind === "bot" ? target.botId : target.memberBotIds[0];
         if (!contextBotId) throw new IsolationError();
         const { cancelledRunIds, historyCompactionGeneration } = await deps.events.clearThread({
@@ -2765,6 +2868,13 @@ export function createRouter(deps: RouterDeps) {
       }),
       followUp: authed.threads.followUp.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (target.kind === "bot" && target.bot.collaborationRestricted) {
+          await sendThreadMessage(deps, context.actor, target, {
+            text: input.text,
+            clientNonce: input.clientNonce,
+          });
+          return { ok: true as const };
+        }
         if (target.kind === "bot") {
           await assertTeachingSendAllowed(deps.prisma, context.actor.spaceId, target.botId);
           const sent = await deps.events.sendUserMessage({
@@ -3013,6 +3123,16 @@ export function createRouter(deps: RouterDeps) {
       }),
       answer: authed.threads.answer.handler(async ({ context, input }) => {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
+        if (
+          target.kind === "bot" &&
+          target.bot.collaborationRestricted &&
+          target.bot.userId !== context.actor.userId
+        ) {
+          const membership = await deps.prisma.botCollaborator.findUnique({
+            where: { botId_userId: { botId: target.botId, userId: context.actor.userId } },
+          });
+          if (!membership?.canApprove) throw new ORPCError("FORBIDDEN");
+        }
         const answered = await deps.events
           .answerRunInput({
             spaceId: context.actor.spaceId,
@@ -6701,7 +6821,7 @@ export function createRouter(deps: RouterDeps) {
       }),
       create: authed.artifacts.create.handler(async ({ context, input }) => {
         const botId = input.botId
-          ? (await repos.getBot(context.actor, input.botId)).id
+          ? (await repos.getAccessibleBot(context.actor, input.botId)).id
           : (await groupRepos.getGroupTarget(context.actor, input.groupId!)).members[0]?.bot.id;
         if (!botId) throw new IsolationError();
         try {
@@ -6728,7 +6848,13 @@ export function createRouter(deps: RouterDeps) {
             contextBotId,
           });
         }
-        await repos.getBot(context.actor, input.botId!);
+        const bot = await repos.getAccessibleBot(context.actor, input.botId!);
+        if (bot.collaborationRestricted) {
+          return getSpaceArtifactById(deps, context.actor, {
+            artifactId: input.artifactId,
+            botId: bot.id,
+          });
+        }
         try {
           return await getOwnedArtifact(deps, context.actor, {
             botId: input.botId!,
@@ -7061,7 +7187,7 @@ async function memberSpaceNavigation(
     contentBots,
     contentGroups,
   ] = await Promise.all([
-    repos.listBots(actor),
+    repos.listBots(actor, { accessible: true }),
     groupRepos.listGroups(actor),
     repos.listSpaceBotsForSpaces(actor, inactiveSpaceIds),
     groupRepos.listSpaceGroupsForSpaces(actor, inactiveSpaceIds),

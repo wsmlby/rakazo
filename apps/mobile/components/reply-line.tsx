@@ -62,7 +62,7 @@ export function ReplyLine({
         selectable={false}
         style={{ flexShrink: 1, color: tokens.mutedForeground, ...typeScale.footnote }}
       >
-        {unavailable ? t("Original message unavailable") : `${author}: ${text}`}
+        {unavailable ? t("Original message unavailable") : `${author ? `${author}: ` : ""}${text}`}
       </Text>
     </Pressable>
   );

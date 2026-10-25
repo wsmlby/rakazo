@@ -8,6 +8,7 @@ export type InboxSwipeRowProps = {
   rowKey: string;
   unread?: boolean;
   pinned?: boolean;
+  accessRole?: string;
   /** Bots only; groups have no finish notifications. */
   notifyOnFinish?: boolean;
   sectionId?: string | null;

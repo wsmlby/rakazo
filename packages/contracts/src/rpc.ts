@@ -39,6 +39,9 @@ import {
   BotSchema,
   BotSectionName,
   BotSectionSchema,
+  BotSharingGrantInput,
+  BotSharingStateSchema,
+  BotSharingTargetInput,
   CapabilityInstallSchema,
   ComputerModeSchema,
   ComputerReleaseReasonSchema,
@@ -338,6 +341,12 @@ export const appContract = {
       .output(z.object({ ok: z.literal(true) })),
   },
   bots: {
+    sharing: {
+      get: oc.input(botId).output(BotSharingStateSchema),
+      grant: oc.input(BotSharingGrantInput).output(z.object({ ok: z.literal(true) })),
+      revoke: oc.input(BotSharingTargetInput).output(z.object({ ok: z.literal(true) })),
+      transfer: oc.input(BotSharingTargetInput).output(z.object({ ok: z.literal(true) })),
+    },
     list: oc.output(z.array(BotSchema)),
     listArchived: oc.output(z.array(BotSchema)),
     get: oc.input(botId).output(BotSchema),
@@ -406,6 +415,8 @@ export const appContract = {
           before: z.number().int().nonnegative().optional(),
           includePeerRuns: z.boolean().optional(),
           includePeerReceipts: z.boolean().optional(),
+          /** Owner only: read one collaborator's private exchange instead of the owner's own thread. */
+          collaboratorUserId: Id.optional(),
           around: z
             .object({
               messageId: Id.optional(),
@@ -435,7 +446,9 @@ export const appContract = {
         }),
       )
       .output(z.object({ ok: z.literal(true), runIds: z.array(Id).optional() })),
-    stop: oc.input(threadTarget).output(z.object({ ok: z.literal(true) })),
+    stop: oc
+      .input(threadTarget.safeExtend({ runId: Id.optional() }))
+      .output(z.object({ ok: z.literal(true) })),
     followUp: oc
       .input(
         threadTarget.safeExtend({

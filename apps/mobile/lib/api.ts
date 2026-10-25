@@ -1,5 +1,6 @@
 import type {
   AccountSecurity,
+  AppContract,
   AuthCapabilities,
   Bot,
   BotSection,
@@ -796,16 +797,13 @@ export async function rpc<T>(
   const uses = aiDataUsesForProcedure(proc, body);
   const consentContext =
     options.requestContext ?? (uses.length ? await captureApiRequestContext() : undefined);
+  const consentQuery = { uses, ...aiConsentTarget(body) };
   await ensureAiDataConsent({
     uses,
-    status: () =>
-      rpc(
-        "aiConsent/status",
-        { uses, ...aiConsentTarget(body) },
-        { requestContext: consentContext },
-      ),
+    status: () => rpc("aiConsent/status", consentQuery, { requestContext: consentContext }),
     prompt: promptAiConsent,
-    allow: (input) => rpc("aiConsent/allow", input, { requestContext: consentContext }),
+    allow: (input) =>
+      rpc("aiConsent/allow", { ...input, query: consentQuery }, { requestContext: consentContext }),
     coalesceKey: consentContext ? aiConsentCoalesceKey(consentContext) : undefined,
   });
   // Abort with an explicit reason so every consumer of the signal (the fetch, the bounded body
@@ -1022,10 +1020,17 @@ export type MobileBot = Pick<
   | "autoSpeak"
   | "fleetManagement"
   | "crossSpaceCommunication"
+  | "ownerUserId"
+  | "accessRole"
+  | "canApprove"
+  | "collaborationRestricted"
 > &
   Partial<Pick<Bot, "parentBotId" | "spaceId" | "instructions">>;
 
 export type MobileBotSection = BotSection;
+export type MobileBotSharing = ReturnType<
+  NonNullable<AppContract["bots"]["sharing"]["get"]["~orpc"]["outputSchema"]>["parse"]
+>;
 
 export type MobileMe = Pick<
   Me,
@@ -1053,6 +1058,8 @@ export type MobileMessage = {
   seq?: number;
   runId?: string;
   role: "user" | "bot" | "system";
+  authorUserId?: string;
+  authorName?: string;
   /** Set when the message was sent from a live voice call; groups one call's transcript. */
   callId?: string;
   botId?: string;
@@ -1088,8 +1095,14 @@ export type MobileSnapshot = {
   cursor?: number;
   messages: MobileMessage[];
   olderCursor: number | null;
-  run: { id: string; botId?: string; status: string; error?: string | null } | null;
-  activeRuns?: Array<{ id: string; botId?: string; status: string }>;
+  run: {
+    id: string;
+    botId?: string;
+    requesterUserId?: string;
+    status: string;
+    error?: string | null;
+  } | null;
+  activeRuns?: Array<{ id: string; botId?: string; requesterUserId?: string; status: string }>;
   members?: MobileGroup["members"];
   computer?: {
     state: string;
@@ -1622,6 +1635,14 @@ export function applyMobileThreadEvent(
       createdAt: known?.createdAt ?? event.createdAt,
       runId: event.runId ? String(event.runId) : undefined,
       role: (event.payload?.role as MobileMessage["role"]) ?? "bot",
+      authorUserId:
+        typeof event.payload?.authorUserId === "string"
+          ? event.payload.authorUserId
+          : known?.authorUserId,
+      authorName:
+        typeof event.payload?.authorName === "string"
+          ? event.payload.authorName
+          : known?.authorName,
       // An update can leave the call id out — the `end_call` marker does — so keep the one
       // the message already carries instead of dropping it out of its call.
       callId: typeof event.payload?.callId === "string" ? event.payload.callId : known?.callId,

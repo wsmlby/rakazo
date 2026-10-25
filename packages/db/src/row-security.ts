@@ -112,6 +112,8 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
   "TaughtSkill",
   "AgentSkill",
   "Bot",
+  "BotCollaborator",
+  "BotUserPreference",
   "Run",
   "Task",
   "Routine",
@@ -140,7 +142,7 @@ export const ROW_SECURITY_MODELS: ReadonlySet<string> = new Set([
  * generation stay open to a connection that does not claim it, which is the
  * previous release while it runs beside this one during a deploy.
  */
-const RLS_VERSION = "2";
+const RLS_VERSION = "3";
 
 type Settings = [spaceId: string, userId: string, bypass: "on" | "off", version: string];
 

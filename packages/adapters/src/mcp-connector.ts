@@ -395,6 +395,7 @@ export class McpConnector implements ConnectorProvider {
   }
 
   private async authorizedTools(context: AdapterContext): Promise<ConnectorTool[]> {
+    if (context.collaborationRestricted) return [];
     if (!context.botId) return [];
     const assignments = await this.prisma.botMcpServer.findMany({
       where: {
@@ -571,6 +572,10 @@ export class McpConnector implements ConnectorProvider {
   }
 
   async *execute(call: ConnectorCall, context: AdapterContext): AsyncIterable<ConnectorEvent> {
+    if (context.collaborationRestricted) {
+      yield { type: "error", message: "MCP sessions are not bot-isolated for shared bots." };
+      return;
+    }
     if (call.route?.connectorId !== "mcp") {
       yield { type: "error", message: `MCP route required for ${call.tool}` };
       return;

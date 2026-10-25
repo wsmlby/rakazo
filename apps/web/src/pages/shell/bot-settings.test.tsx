@@ -159,6 +159,31 @@ async function renderSettings(onSave: (patch: SavePatch) => Promise<void>, curre
 }
 
 describe("BotSettings help", () => {
+  it("does not offer permanently unavailable tools on previously shared bots", async () => {
+    await renderSettings(
+      vi.fn(async () => undefined),
+      { ...bot, collaborationRestricted: true },
+    );
+    expect(container.querySelector('[data-testid="bot-settings-tools"]')).toBeNull();
+    expect(
+      container.querySelector('[aria-label="Allow cross-space bot communication"]'),
+    ).toBeNull();
+    expect(container.textContent).not.toContain("Manage the bots it creates");
+  });
+
+  it("limits collaborators to personal notification preferences", async () => {
+    const onSave = vi.fn(async () => undefined);
+    await renderSettings(onSave, { ...bot, accessRole: "collaborator" });
+    expect(container.querySelector('[data-testid="bot-profile-header"]')).toBeNull();
+    expect(container.querySelector('[data-testid="bot-sharing"]')).toBeNull();
+    expect(container.querySelector('[data-testid="bot-settings-advanced"]')).toBeNull();
+    expect(container.textContent).not.toContain("Clear conversation");
+    const toggle = container.querySelector<HTMLButtonElement>('[role="switch"]');
+    expect(toggle).not.toBeNull();
+    await act(async () => toggle?.click());
+    expect(onSave).toHaveBeenCalledWith({ notifyOnFinish: false });
+  });
+
   it("shows the management subtitle without changing the management switch", async () => {
     const onSave = vi.fn<(patch: SavePatch) => Promise<void>>(async () => undefined);
     await renderSettings(onSave, { ...bot, fleetManagement: false });

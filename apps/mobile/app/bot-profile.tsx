@@ -151,42 +151,46 @@ export default function BotProfile() {
           title={t("Artifacts")}
           onPress={() => router.push({ pathname: "/artifacts", params: { botId } })}
         />
-        <SettingsRow
-          key="computer"
-          accessibilityRole="button"
-          chevron="right"
-          title={t("Computer")}
-          onPress={() => router.push({ pathname: "/computer", params: { botId, name } })}
-        />
+        {bot && bot.accessRole !== "collaborator" ? (
+          <SettingsRow
+            key="computer"
+            accessibilityRole="button"
+            chevron="right"
+            title={t("Computer")}
+            onPress={() => router.push({ pathname: "/computer", params: { botId, name } })}
+          />
+        ) : null}
       </SettingsGroup>
       {/* Routines show only once there is something to list, or a load to retry. */}
-      <SettingsGroup label={t("Routines")}>
-        {routinesError ? (
-          <SettingsRow
-            key="error"
-            accessibilityRole="button"
-            title={routinesError}
-            detail={t("Try again.")}
-            onPress={() => void loadRoutines()}
-          />
-        ) : (
-          routines?.map((routine) => (
+      {bot && bot.accessRole !== "collaborator" ? (
+        <SettingsGroup label={t("Routines")}>
+          {routinesError ? (
             <SettingsRow
-              key={routine.id}
+              key="error"
               accessibilityRole="button"
-              chevron="right"
-              title={routine.name}
-              detail={routineRowDetail(routine, timeZone)}
-              onPress={() =>
-                router.push({
-                  pathname: "/routine",
-                  params: { botId, botName: name, routineId: routine.id, origin: "profile" },
-                })
-              }
+              title={routinesError}
+              detail={t("Try again.")}
+              onPress={() => void loadRoutines()}
             />
-          ))
-        )}
-      </SettingsGroup>
+          ) : (
+            routines?.map((routine) => (
+              <SettingsRow
+                key={routine.id}
+                accessibilityRole="button"
+                chevron="right"
+                title={routine.name}
+                detail={routineRowDetail(routine, timeZone)}
+                onPress={() =>
+                  router.push({
+                    pathname: "/routine",
+                    params: { botId, botName: name, routineId: routine.id, origin: "profile" },
+                  })
+                }
+              />
+            ))
+          )}
+        </SettingsGroup>
+      ) : null}
       {bot ? (
         <SettingsGroup footer={t("Get notified when this Bot finishes or needs input")}>
           <SettingsSwitch

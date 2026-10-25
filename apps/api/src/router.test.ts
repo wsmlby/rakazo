@@ -444,6 +444,14 @@ describe("model setup gate", () => {
     deploymentModelCredentialCipher?: string;
   }) {
     const prisma = {
+      bot: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: "bot-1",
+          userId: "user-1",
+          thread: { id: "thread-1" },
+          computer: null,
+        }),
+      },
       user: {
         findUniqueOrThrow: vi.fn().mockResolvedValue({
           email: "user@rakazo.test",
@@ -638,6 +646,7 @@ describe("thread answer delivery", () => {
       bot: {
         findFirst: vi.fn().mockResolvedValue({
           id: "bot-1",
+          userId: "user-1",
           thread: { id: "thread-1" },
           computer: null,
         }),
@@ -706,6 +715,7 @@ describe("oversized one-time answer", () => {
       bot: {
         findFirst: vi.fn().mockResolvedValue({
           id: "bot-1",
+          userId: "user-1",
           thread: { id: "thread-1" },
           computer: null,
         }),
@@ -758,6 +768,7 @@ describe("secret request dismissal", () => {
       bot: {
         findFirst: vi.fn().mockResolvedValue({
           id: "bot-1",
+          userId: "user-1",
           thread: { id: "thread-1" },
           computer: null,
         }),
@@ -901,6 +912,7 @@ describe("thread stream authorization", () => {
       bot: {
         findFirst: vi.fn().mockResolvedValue({
           id: "bot-1",
+          userId: "user-1",
           thread: { id: "thread-1" },
           computer: null,
         }),

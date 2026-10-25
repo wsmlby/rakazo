@@ -25,20 +25,26 @@ export async function withNewestThreadMessages<T extends { thread: { id: string 
   prisma: PrismaClient,
   parents: T[],
   limit: number,
+  /** Restrict each thread to one exchange: a collaborator's id, or null for the owner's own. */
+  audienceOf?: (parent: T) => string | null,
 ) {
   const threadIds = parents.flatMap((parent) => (parent.thread ? [parent.thread.id] : []));
+  const audiences = parents.flatMap((parent) =>
+    parent.thread ? [audienceOf?.(parent) ?? null] : [],
+  );
   const loaded =
     threadIds.length === 0
       ? []
       : await prisma.$queryRaw<SidebarPreviewMessage[]>(Prisma.sql`
           SELECT m.id, m."threadId", m.seq, m.role, m.blocks, m."botId",
             m."replyToMessageId", m."replyQuote", m."runId", m."clientNonce", m."createdAt"
-          FROM unnest(${threadIds}::text[]) AS t(id)
+          FROM unnest(${threadIds}::text[], ${audiences}::text[]) AS t(id, audience)
           CROSS JOIN LATERAL (
             SELECT id, "threadId", seq, role, blocks, "botId", "replyToMessageId", "replyQuote",
               "runId", "clientNonce", "createdAt"
             FROM messages
             WHERE "threadId" = t.id
+              AND (${audienceOf ? Prisma.sql`"audienceUserId" IS NOT DISTINCT FROM t.audience` : Prisma.sql`TRUE`})
             ORDER BY seq DESC
             LIMIT ${limit}
           ) m

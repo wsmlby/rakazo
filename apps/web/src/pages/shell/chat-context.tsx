@@ -186,7 +186,8 @@ export function ReplyLine({
         <ReplyThumbnail attachment={attachment} target={target} lazy />
       ) : null}
       <span className="min-w-0 truncate">
-        {author}: {text}
+        {author ? `${author}: ` : ""}
+        {text}
       </span>
     </button>
   );

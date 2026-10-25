@@ -482,6 +482,9 @@ model SpaceVoicePreference {
 }
 
 model Bot {
+  collaborationRestricted Boolean @default(false)
+  collaborators BotCollaborator[]
+  userPreferences BotUserPreference[]
   screenGeneration Int @default(0)
   id                String            @id @default(cuid())
   spaceId           String
@@ -548,6 +551,36 @@ model Bot {
   @@index([computerId])
   @@index([parentBotId])
   @@map("bots")
+}
+
+model BotCollaborator {
+  botId String
+  userId String
+  spaceId String
+  canApprove Boolean @default(false)
+  createdAt DateTime @default(now())
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@id([botId, userId])
+  @@index([spaceId, userId])
+  @@map("bot_collaborators")
+}
+
+model BotUserPreference {
+  botId String
+  userId String
+  spaceId String
+  pinned Boolean @default(false)
+  sectionId String?
+  notifyOnFinish Boolean @default(true)
+  autoSpeak Boolean @default(false)
+  lastReadSeq Int @default(-1)
+  manualUnread Boolean @default(false)
+  bot Bot @relation(fields: [botId], references: [id], onDelete: Cascade)
+
+  @@id([botId, userId])
+  @@index([spaceId, userId])
+  @@map("bot_user_preferences")
 }
 
 model BotSection {
@@ -646,6 +679,8 @@ model Thread {
 }
 
 model Message {
+  authorUserId     String?
+  authorName       String?
   id               String    @id @default(cuid())
   threadId         String
   thread           Thread    @relation(fields: [threadId], references: [id], onDelete: Cascade)
@@ -664,11 +699,14 @@ model Message {
   sourceRuns            Run[]             @relation("RunSourceMessage")
   externalTranscriptFor  ExternalMessage?
   steeringMessages SteeringMessage[]
+  /// The collaborator whose private exchange with the bot this message belongs to; null for the owner's own thread.
+  audienceUserId   String?
   createdAt        DateTime  @default(now())
 
   @@unique([threadId, seq])
   @@unique([threadId, clientNonce])
   @@index([threadId, seq])
+  @@index([threadId, audienceUserId, seq])
   @@index([replyToMessageId])
   @@index([searchTokens], type: Gin)
   @@map("messages")
@@ -695,6 +733,7 @@ model Event {
 }
 
 model Task {
+  requesterUserId String?
   id        String   @id @default(cuid())
   spaceId   String
   space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
@@ -714,6 +753,7 @@ model Task {
 }
 
 model Run {
+  requesterUserId String?
   id                   String            @id @default(cuid())
   spaceId              String
   space                Space             @relation(fields: [spaceId], references: [id], onDelete: Cascade)

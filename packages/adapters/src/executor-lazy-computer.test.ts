@@ -41,6 +41,24 @@ async function runRoutine(
     exportError?: Error;
     setupError?: Error;
     onRunStarted?: () => void;
+    shared?: boolean;
+    sharedOwner?: boolean;
+    revoked?: boolean;
+    revokedMembership?: boolean;
+    scripted?: boolean;
+    executionUserId?: string;
+    otherComputerBot?: boolean;
+    taughtSkills?: boolean;
+    semanticMemory?: boolean;
+    approvedShell?: boolean;
+    noComputer?: boolean;
+    computerOwner?: string;
+    computerSpace?: string;
+    teamComputer?: boolean;
+    botCommandSecret?: boolean;
+    revokeAfterFirst?: boolean;
+    detachAfterFirst?: boolean;
+    browser?: boolean;
   } = {},
 ) {
   const attachment: Extract<MessageBlock, { kind: "file" | "image" }> = {
@@ -56,7 +74,8 @@ async function runRoutine(
     threadId: "thread-1",
     taskId: "task-1",
     spaceId: "space-1",
-    userId: "user-1",
+    userId: options.executionUserId ?? "user-1",
+    requesterUserId: options.shared ? (options.sharedOwner ? "user-1" : "coworker") : undefined,
     status: "queued",
     trigger: options.attachments && !options.steering ? "user" : "routine",
     sourceMessageId: options.attachments && !options.steering ? "message-1" : null,
@@ -65,7 +84,18 @@ async function runRoutine(
     leaseFence: 0,
   };
   const toolResults: unknown[] = [];
+  const approvedShellEffect = {
+    id: "shell-effect",
+    runId: run.id,
+    spaceId: run.spaceId,
+    kind: "shell",
+    status: "approved",
+    idempotencyKey: "approved-shell",
+    request: { command: "printf bot-work" },
+  };
   const steeringInputs: unknown[] = [];
+  let revoked = options.revoked;
+  let noComputer = options.noComputer;
   const runtimeRun = vi.fn(async function* (request: AgentRunRequest) {
     if (options.steering && !options.steeringAfterFirst) {
       steeringInputs.push(...((await request.claimSteering?.([])) ?? []));
@@ -79,6 +109,8 @@ async function runRoutine(
       if (index === 0 && options.steeringAfterFirst) {
         steeringInputs.push(...((await request.claimSteering?.([])) ?? []));
       }
+      if (index === 0 && options.revokeAfterFirst) revoked = true;
+      if (index === 0 && options.detachAfterFirst) noComputer = true;
       if (options.toolFailure === "abort") throw new DOMException("Aborted", "AbortError");
     };
     if (options.parallel) await Promise.all(toolCalls.map(execute));
@@ -108,24 +140,36 @@ async function runRoutine(
     bot: {
       findUniqueOrThrow: vi.fn(async () => ({
         id: run.botId,
+        userId: "user-1",
+        spaceId: "space-1",
+        homeKey: "previous-owner-home",
+        collaborationRestricted: options.shared ?? false,
         name: "Assistant",
         title: "Assistant",
         description: "Test assistant",
         modelProvider: null,
         modelId: null,
         thinkingLevel: null,
-        computerId: "computer-1",
+        computerId: noComputer ? null : "computer-1",
         computerSwitching: false,
         memoryScope: null,
-        computer: {
-          id: "computer-1",
-          scope: "dedicated",
-          kind: options.native ? "desktop" : "e2b",
-          homeKey: "home-1",
-        },
+        computer: noComputer
+          ? null
+          : {
+              id: "computer-1",
+              scope: options.teamComputer ? "team" : "dedicated",
+              kind: options.native ? "desktop" : "e2b",
+              homeKey: "home-1",
+              userId: options.computerOwner ?? "user-1",
+              spaceId: options.computerSpace ?? "space-1",
+            },
       })),
       findUnique: vi.fn(async () => ({ name: "Assistant" })),
-      findMany: vi.fn(async () => []),
+      findMany: vi.fn(async () =>
+        options.shared
+          ? [{ id: run.botId }, ...(options.otherComputerBot ? [{ id: "other-bot" }] : [])]
+          : [],
+      ),
     },
     attempt: {
       create: vi.fn(async () => ({ id: "attempt-1" })),
@@ -165,7 +209,16 @@ async function runRoutine(
       findFirst: vi.fn(async () => null),
       count: vi.fn(async () => 0),
     },
-    task: { findUniqueOrThrow: vi.fn(async () => ({ id: run.taskId, prompt: "Sweep the inbox" })) },
+    botCollaborator: {
+      findFirst: vi.fn(async () => (revoked ? null : { userId: "coworker" })),
+    },
+    spaceMember: {
+      findUnique: vi.fn(async () => (options.revokedMembership ? null : { id: "membership-1" })),
+    },
+    task: {
+      findUniqueOrThrow: vi.fn(async () => ({ id: run.taskId, prompt: "Sweep the inbox" })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
     computer: { updateMany: vi.fn(async () => ({ count: 1 })) },
     connection: { findMany: vi.fn(async () => []) },
     spaceModelPreference: { findFirst: vi.fn(async () => null) },
@@ -178,12 +231,49 @@ async function runRoutine(
         defaultModelId: "deepseek/deepseek-v4-flash-0731",
       })),
     },
-    taughtSkill: { findMany: vi.fn(async () => []) },
+    taughtSkill: {
+      findFirst: vi.fn(async () => null),
+      findMany: vi.fn(async () =>
+        options.taughtSkills
+          ? [
+              {
+                id: "taught-1",
+                name: "Export report",
+                goal: "Export report",
+                playbook: { steps: [] },
+              },
+            ]
+          : [],
+      ),
+    },
     agentSecret: { findMany: vi.fn(async () => []) },
-    botSecret: { findMany: vi.fn(async () => []) },
+    botSecret: {
+      findMany: vi.fn(async () =>
+        options.botCommandSecret
+          ? [
+              {
+                id: "bot-secret-1",
+                name: "bot-token",
+                auth: { type: "command" },
+                ciphertext: "fake-bot-ciphertext",
+              },
+            ]
+          : [],
+      ),
+    },
     agentSkill: { findMany: vi.fn(async () => []) },
     scratchpadItem: { findMany: vi.fn(async () => []) },
-    externalEffect: { findMany: vi.fn(async () => []) },
+    externalEffect: {
+      findMany: vi.fn(async (query?: { where?: { status?: unknown } }) =>
+        options.approvedShell && query?.where?.status === "approved" ? [approvedShellEffect] : [],
+      ),
+      findUnique: vi.fn(async () => (options.approvedShell ? approvedShellEffect : null)),
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+        id: "effect-1",
+        ...data,
+      })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+    },
     artifact: {
       findMany: vi.fn(async () =>
         options.attachments
@@ -201,7 +291,7 @@ async function runRoutine(
     },
   };
   const sandbox = {
-    describe: () => ({ id: "e2b", capabilities: { graphical: false } }),
+    describe: () => ({ id: "e2b", capabilities: { graphical: options.browser ?? false } }),
     environment: options.native
       ? vi.fn(async () => {
           if (options.nativeUnavailable) throw new Error("native app is closed");
@@ -209,6 +299,10 @@ async function runRoutine(
         })
       : undefined,
     listFiles: vi.fn(async () => [{ path: "notes.txt", kind: "file", size: 4 }]),
+    execute: vi.fn(async function* () {
+      yield { type: "stdout" as const, data: "bot-work" };
+      yield { type: "exit" as const, code: 0 };
+    }),
     writeFile: vi.fn(async () => undefined),
     releaseScreen: vi.fn(async () => undefined),
     exportWorkspace: vi.fn(async function* () {
@@ -220,17 +314,38 @@ async function runRoutine(
     sandbox.writeFile.mockRejectedValueOnce(new Error("temporary copy failure"));
   const finalizeRun = vi.fn(async () => ({ continuationRunId: null }));
   const enqueue = vi.fn(async () => undefined);
+  const memoryRead = vi.fn(async (_input: { scope: string }) => ({ documents: [] }));
+  const memoryCommit = vi.fn(async () => ({ revision: 1 }));
+  const semanticMemory = {
+    recall: vi.fn(async () => ({ ok: true, value: [] })),
+    save: vi.fn(async () => ({ ok: true, value: { id: "fact-1" } })),
+  };
+  const discoverTools = vi.fn(async () => []);
+  const secretLoad = vi.fn(async (_ciphertext: string) => "fake-bot-command-value");
+  const browser = {
+    describe: () => ({ capabilities: { page: true } }),
+    snapshot: vi.fn(async () => ({
+      url: "https://example.test",
+      title: "Bot page",
+      tree: "page",
+      elements: [],
+    })),
+  };
   const executor = createRunExecutor({
     prisma: withEmptyModels(prisma),
     deploymentModelKey: "fake-deployment-key",
-    runtime: { describe: () => ({ capabilities: { scripted: false } }), run: runtimeRun },
+    runtime: {
+      describe: () => ({ capabilities: { scripted: options.scripted ?? false } }),
+      run: runtimeRun,
+    },
     sandbox,
+    ...(options.browser ? { browser } : {}),
     home: { commit: vi.fn(async () => "fixture-revision") },
-    memory: { read: async () => ({ documents: [] }) },
+    memory: { read: memoryRead, commit: memoryCommit },
     memoryProviders: {
       resolve: async () => {
         if (options.setupError) throw options.setupError;
-        return null;
+        return options.semanticMemory ? { defaultScope: "shared", provider: semanticMemory } : null;
       },
     },
     artifacts: { get: vi.fn(async () => new Uint8Array([1, 2, 3, 4])) },
@@ -245,6 +360,11 @@ async function runRoutine(
     jobs: { enqueue },
     notifications: { send: vi.fn(async () => undefined) },
     secrets: [],
+    secretStore: { load: secretLoad },
+    connector: {
+      describe: () => ({ id: "connector-registry" }),
+      discoverTools,
+    },
   } as unknown as Parameters<typeof createRunExecutor>[0]);
 
   await executor.continueRun(
@@ -270,6 +390,12 @@ async function runRoutine(
     steeringInputs,
     prisma,
     run,
+    memoryRead,
+    memoryCommit,
+    semanticMemory,
+    discoverTools,
+    secretLoad,
+    browser,
   };
 }
 
@@ -280,12 +406,275 @@ beforeEach(() => {
   provisionComputer.mockResolvedValue(COMPUTER);
 });
 
+it.each([false, true])("restores dedicated browser tools (owner: %s)", async (sharedOwner) => {
+  const { runtimeRun, browser, toolResults, finalizeRun } = await runRoutine(
+    [{ name: "browser_snapshot", args: {} }],
+    { shared: true, sharedOwner, browser: true },
+  );
+  expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+  expect(runtimeRun.mock.calls[0]?.[0].tools?.map((tool) => tool.name)).toEqual(
+    expect.arrayContaining(["browser_navigate", "browser_snapshot", "browser_act"]),
+  );
+  expect(toolResults[0]).toEqual(expect.objectContaining({ title: "Bot page" }));
+  expect(browser.snapshot).toHaveBeenCalledWith(
+    COMPUTER,
+    expect.any(Object),
+    expect.objectContaining({ collaborationRestricted: true }),
+  );
+});
+
 afterEach(() => {
   vi.clearAllMocks();
   installLogger(createLogger({ service: "test", level: "off", sinks: [] }));
 });
 
 describe("run computer provisioning", () => {
+  it.each([false, true])("isolates shared requests (owner: %s)", async (sharedOwner) => {
+    const { runtimeRun, finalizeRun, prisma, memoryRead, discoverTools } = await runRoutine([], {
+      shared: true,
+      sharedOwner,
+    });
+    expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+    const tools = runtimeRun.mock.calls[0]?.[0].tools?.map((tool) => tool.name);
+    expect(tools).toEqual(
+      expect.arrayContaining(["list_files", "shell", "remember", "skill_read"]),
+    );
+    expect(tools).not.toContain("save_shared_memory");
+    expect(tools).not.toContain("skill_update");
+    expect(prisma.connection.findMany).not.toHaveBeenCalled();
+    expect(prisma.agentSecret.findMany).not.toHaveBeenCalled();
+    expect(prisma.agentSkill.findMany).not.toHaveBeenCalled();
+    expect(discoverTools).not.toHaveBeenCalled();
+    expect(prisma.bot.findMany).toHaveBeenCalledExactlyOnceWith({
+      where: { computerId: "computer-1" },
+      select: { id: true },
+    });
+    expect(memoryRead).toHaveBeenCalledTimes(1);
+    expect(memoryRead.mock.calls[0]?.[0]).toEqual({ scope: "bot", botId: "bot-1" });
+    expect(provisionComputer).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    "save_shared_memory",
+    "list_fleet",
+    "board_tickets",
+    "search_history",
+    "read_history",
+    "connect_app",
+    "skill_update",
+    "cloud_agent_launch",
+    "message_bot",
+    "catalog_execute",
+    "mcp__assigned__echo",
+  ])("rejects hidden %s even if a runtime calls it", async (name) => {
+    const { finalizeRun, sandbox, toolResults } = await runRoutine(
+      [{ name, args: { path: "MEMORY.md", content: "forbidden" } }],
+      { shared: true },
+    );
+    expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+    expect(toolResults).toEqual([{ error: expect.any(String) }]);
+    expect(sandbox.writeFile).not.toHaveBeenCalled();
+    expect(provisionComputer).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("runs bot files/memory (owner: %s)", async (sharedOwner) => {
+    const { finalizeRun, sandbox, memoryRead, memoryCommit, toolResults } = await runRoutine(
+      [
+        { name: "list_files", args: { path: "" } },
+        { name: "write_file", args: { path: "notes.txt", content: "bot output" } },
+        { name: "remember", args: { path: "MEMORY.md", content: "bot fact" } },
+      ],
+      { shared: true, sharedOwner },
+    );
+    expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+    expect(sandbox.listFiles).toHaveBeenCalledOnce();
+    expect(sandbox.writeFile).toHaveBeenCalledOnce();
+    expect(memoryCommit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: "bot",
+        botId: "bot-1",
+        path: "MEMORY.md",
+      }),
+      expect.objectContaining({ collaborationRestricted: true, botId: "bot-1" }),
+    );
+    expect(toolResults).toHaveLength(3);
+    expect(memoryRead.mock.calls.every(([request]) => request.scope === "bot")).toBe(true);
+  });
+
+  it("reads only bot-taught skills, never arbitrary personal skill IDs", async () => {
+    const { toolResults, prisma } = await runRoutine(
+      [
+        { name: "skill_read", args: { skillId: "taught-1" } },
+        { name: "skill_read", args: { skillId: "owner-personal-skill" } },
+      ],
+      { shared: true, taughtSkills: true },
+    );
+    expect(toolResults[0]).toEqual(expect.objectContaining({ id: "taught-1" }));
+    expect(toolResults[1]).toEqual({ error: expect.any(String) });
+    expect(prisma.agentSkill.findMany).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("isolates semantic memory (owner: %s)", async (sharedOwner) => {
+    const { semanticMemory, toolResults } = await runRoutine(
+      [
+        { name: "save_memory", args: { content: "bot fact" } },
+        { name: "recall_memory", args: { query: "bot fact" } },
+        { name: "save_memory", args: { content: "not allowed", scope: "shared" } },
+      ],
+      { shared: true, sharedOwner, semanticMemory: true },
+    );
+    expect(semanticMemory.save).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ botId: "bot-1", scope: "isolated", content: "bot fact" }),
+      expect.objectContaining({ collaborationRestricted: true }),
+    );
+    expect(semanticMemory.recall).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ botId: "bot-1", scope: "isolated" }),
+      expect.objectContaining({ collaborationRestricted: true }),
+    );
+    expect(toolResults[2]).toEqual({ error: expect.any(String) });
+  });
+
+  it.each([false, true])("uses only bot secrets (owner: %s)", async (sharedOwner) => {
+    const { sandbox, finalizeRun, toolResults, prisma, secretLoad } = await runRoutine(
+      [{ name: "shell", args: { command: "printf bot-work" } }],
+      { shared: true, sharedOwner, approvedShell: true, botCommandSecret: true },
+    );
+    expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+    expect(sandbox.execute).toHaveBeenCalledOnce();
+    expect(toolResults[0]).toEqual(expect.objectContaining({ stdout: "bot-work" }));
+    expect(prisma.agentSecret.findMany).not.toHaveBeenCalled();
+    expect(sandbox.execute).toHaveBeenCalledWith(
+      COMPUTER,
+      expect.objectContaining({ env: { BOT_TOKEN: "fake-bot-command-value" } }),
+      expect.objectContaining({ collaborationRestricted: true }),
+    );
+    expect(
+      secretLoad.mock.calls.every(([ciphertext]) => ciphertext === "fake-bot-ciphertext"),
+    ).toBe(true);
+    expect(prisma.botSecret.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "user-1", spaceId: "space-1", botId: "bot-1" },
+      }),
+    );
+  });
+
+  it("refuses a shared bot computer assigned to another bot", async () => {
+    const { run, runtimeRun } = await runRoutine([], { shared: true, otherComputerBot: true });
+    expect(run.status).toBe("cancelled");
+    expect(runtimeRun).not.toHaveBeenCalled();
+    expect(provisionComputer).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { native: true },
+    { teamComputer: true },
+    { computerOwner: "previous-owner" },
+    { computerSpace: "other-space" },
+  ])("refuses an invalid shared computer: %j", async (options) => {
+    const { run, runtimeRun } = await runRoutine([], { shared: true, ...options });
+    expect(run.status).toBe("cancelled");
+    expect(runtimeRun).not.toHaveBeenCalled();
+    expect(provisionComputer).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("allows detached bot memory (owner: %s)", async (sharedOwner) => {
+    const { runtimeRun, finalizeRun, toolResults, memoryCommit, sandbox } = await runRoutine(
+      [
+        { name: "remember", args: { content: "transferred bot fact" } },
+        { name: "list_files", args: { path: "" } },
+        { name: "shell", args: { command: "printf bot-work" } },
+      ],
+      { shared: true, sharedOwner, noComputer: true },
+    );
+    expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+    const tools = runtimeRun.mock.calls[0]?.[0].tools?.map((tool) => tool.name);
+    expect(tools).toContain("remember");
+    expect(tools).not.toContain("shell");
+    expect(tools).not.toContain("list_files");
+    expect(memoryCommit).toHaveBeenCalled();
+    expect(toolResults.slice(1)).toEqual([
+      { error: expect.any(String) },
+      { error: expect.any(String) },
+    ]);
+    expect(sandbox.listFiles).not.toHaveBeenCalled();
+    expect(sandbox.execute).not.toHaveBeenCalled();
+    expect(provisionComputer).not.toHaveBeenCalled();
+  });
+
+  it("cannot recover the previous owner's home through a no-computer takeover", async () => {
+    const { finalizeRun } = await runRoutine([], {
+      shared: true,
+      noComputer: true,
+      takeover: true,
+    });
+    expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "failed" }));
+    expect(provisionComputer).not.toHaveBeenCalled();
+  });
+
+  it("rechecks collaboration before each dispatched tool", async () => {
+    const { sandbox } = await runRoutine(
+      [
+        { name: "list_files", args: {} },
+        { name: "write_file", args: { path: "notes.txt", content: "not allowed" } },
+      ],
+      { shared: true, revokeAfterFirst: true, toolFailure: "recover" },
+    );
+    expect(sandbox.listFiles).toHaveBeenCalledOnce();
+    expect(sandbox.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("rejects a detached computer even after it was provisioned", async () => {
+    const { sandbox } = await runRoutine(
+      [
+        { name: "list_files", args: {} },
+        { name: "write_file", args: { path: "notes.txt", content: "not allowed" } },
+      ],
+      { shared: true, detachAfterFirst: true, toolFailure: "recover" },
+    );
+    expect(sandbox.listFiles).toHaveBeenCalledOnce();
+    expect(sandbox.writeFile).not.toHaveBeenCalled();
+    expect(provisionComputer).toHaveBeenCalledOnce();
+  });
+
+  it("accepts collaborator image context only from the explicitly shared bot", async () => {
+    const { prisma, runtimeRun, finalizeRun } = await runRoutine([], {
+      shared: true,
+      attachments: "image",
+    });
+    expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "completed" }));
+    expect(runtimeRun.mock.calls[0]?.[0].currentTurnImages).toHaveLength(1);
+    expect(prisma.artifact.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          botId: "bot-1",
+          groupId: null,
+          bot: { userId: "user-1", collaborationRestricted: true },
+        }),
+      }),
+    );
+  });
+
+  it.each([
+    { revoked: true },
+    { revokedMembership: true },
+    { revokedMembership: true, sharedOwner: true },
+    { executionUserId: "coworker" },
+  ])(
+    "cancels a shared request before execution when authorization is invalid: %j",
+    async (options) => {
+      const { runtimeRun, run } = await runRoutine([], { shared: true, ...options });
+      expect(run.status).toBe("cancelled");
+      expect(runtimeRun).not.toHaveBeenCalled();
+      expect(provisionComputer).not.toHaveBeenCalled();
+    },
+  );
+
+  it("refuses a scripted runtime for shared requests", async () => {
+    const { runtimeRun, finalizeRun } = await runRoutine([], { shared: true, scripted: true });
+    expect(runtimeRun).not.toHaveBeenCalled();
+    expect(finalizeRun).toHaveBeenCalledWith(expect.objectContaining({ outcome: "failed" }));
+  });
+
   it("retries handed-off setup failures with durable attempt accounting and backoff", async () => {
     const onRunStarted = vi.fn();
     const { run, enqueue, runtimeRun, prisma } = await runRoutine([], {

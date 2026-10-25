@@ -969,4 +969,19 @@ export const NL_MESSAGES: Record<string, string> = {
   "How big is your team?": "Hoe groot is je team?",
   "How did you hear about us?": "Hoe heb je over ons gehoord?",
   "Welcome to Rakazo": "Welkom bij Rakazo",
+  "Allow approvals": "Goedkeuringen toestaan",
+  "Allow approvals for {name}": "Goedkeuringen toestaan voor {name}",
+  "Bot access is granted separately.": "Bottoegang wordt apart verleend.",
+  "Bot connections and credentials are removed; routines are paused. Replies use the new owner’s model connection.":
+    "Botverbindingen en inloggegevens worden verwijderd; routines worden gepauzeerd. Antwoorden gebruiken de modelverbinding van de nieuwe eigenaar.",
+  "Choose member": "Lid kiezen",
+  "Members can read all past and future messages and use this bot’s memory. Sharing permanently disables tools. Replies use the owner’s model connection.":
+    "Leden kunnen alle eerdere en toekomstige berichten lezen en het geheugen van deze bot gebruiken. Delen schakelt tools permanent uit. Antwoorden gebruiken de modelverbinding van de eigenaar.",
+  Sharing: "Delen",
+  "Sharing requires a private computer.": "Delen vereist een privécomputer.",
+  Transfer: "Overdragen",
+  "Transfer ownership": "Eigendom overdragen",
+  "Transfer ownership to {name}": "Eigendom overdragen aan {name}",
+  "Transfer ownership to {name}?": "Eigendom overdragen aan {name}?",
+  "Use private computer": "Privécomputer gebruiken",
 };

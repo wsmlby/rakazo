@@ -24,6 +24,28 @@ import {
 } from "./events.js";
 import { modelFallbackFailure, normalizeRunError } from "./run-error.js";
 
+it("preserves a collaborator's authorship in the live shared transcript", () => {
+  expect(
+    projectMessages([
+      {
+        id: "event",
+        threadId: "thread",
+        botId: "bot",
+        seq: 1,
+        type: "thread.message.created",
+        createdAt: new Date(),
+        payload: {
+          messageId: "message",
+          role: "user",
+          blocks: [],
+          authorUserId: "coworker",
+          authorName: "Coworker",
+        },
+      },
+    ])[0],
+  ).toMatchObject({ authorUserId: "coworker", authorName: "Coworker" });
+});
+
 describe("containsSecret", () => {
   it("detects secrets that JSON escaping changes", () => {
     expect(containsSecret({ 'api"key': { nested: 'api"key' } }, ['api"key'])).toBe(true);

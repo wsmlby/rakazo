@@ -227,6 +227,7 @@ it.each([false, true])("keeps history fetch errors visible (provider failure: %s
     createElement,
     View: "div",
     ThreadErrorNotice,
+    collaborator: false,
     showPinnedPage: true,
     pinnedNewerCursor: 10,
     normalizedRunError: failedRun

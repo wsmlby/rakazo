@@ -13,6 +13,7 @@ import {
   userVisibleMessages,
 } from "@rakazo/core";
 import { chooseBotAvatar } from "./bot-avatar-choice.js";
+import { accessibleBotWhere, getAccessibleBot } from "./bot-sharing.js";
 import type { PrismaClient } from "./client.js";
 import type { ComputerMode } from "./computers.js";
 import { ensureComputerRecord, parseComputerMode } from "./computers.js";
@@ -66,6 +67,8 @@ function rosterUpdatedAt(newestMessage: { createdAt: Date } | undefined, botUpda
 function mapBot(
   bot: {
     id: string;
+    userId?: string;
+    collaborationRestricted?: boolean;
     spaceId: string;
     name: string;
     title: string;
@@ -108,6 +111,10 @@ function mapBot(
   }
   return {
     id: bot.id,
+    ownerUserId: bot.userId,
+    accessRole: "owner",
+    canApprove: true,
+    collaborationRestricted: bot.collaborationRestricted,
     spaceId: bot.spaceId,
     name: bot.name,
     title: displayName(bot.title, ""),
@@ -174,13 +181,21 @@ export function createRepos(
     const rows = await prisma.bot.findMany({
       where: {
         spaceId: { in: spaceIds },
-        userId: actor.userId,
+        OR: [
+          { userId: actor.userId },
+          { collaborators: { some: { userId: actor.userId, spaceId: { in: spaceIds } } } },
+        ],
+        space: { memberships: { some: { userId: actor.userId } } },
         archivedAt: null,
       },
       select: {
         id: true,
         spaceId: true,
         name: true,
+        userId: true,
+        collaborationRestricted: true,
+        collaborators: { where: { userId: actor.userId }, select: { canApprove: true } },
+        userPreferences: { where: { userId: actor.userId } },
         title: true,
         color: true,
         notifyOnFinish: true,
@@ -192,26 +207,48 @@ export function createRepos(
           select: {
             id: true,
             unread: true,
+            nextMessageSeq: true,
           },
         },
         runs: activeRunSelection,
       },
       orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
     });
-    const bots = await withNewestThreadMessages(prisma, await withLatestBotRuns(prisma, rows), 1);
+    const bots = await withNewestThreadMessages(
+      prisma,
+      await withLatestBotRuns(prisma, rows),
+      1,
+      (bot) => (bot.userId === actor.userId ? null : actor.userId),
+    );
     return bots.map((bot) => {
       if (!bot.thread) throw new IsolationError("Bot is missing its thread");
       const activeRun = primaryActiveRun(bot.runs);
       return {
         id: bot.id,
+        ownerUserId: bot.userId,
+        accessRole: bot.userId === actor.userId ? "owner" : "collaborator",
+        canApprove: bot.userId === actor.userId || Boolean(bot.collaborators[0]?.canApprove),
+        collaborationRestricted: bot.collaborationRestricted,
         spaceId: bot.spaceId,
         name: bot.name,
         title: displayName(bot.title, ""),
         color: bot.color,
-        notifyOnFinish: bot.notifyOnFinish,
-        pinned: bot.pinned,
-        sectionId: bot.sectionId,
-        unread: bot.thread.unread,
+        notifyOnFinish:
+          bot.userPreferences[0]?.notifyOnFinish ??
+          (bot.userId === actor.userId ? bot.notifyOnFinish : true),
+        pinned:
+          bot.userPreferences[0]?.pinned ?? (bot.userId === actor.userId ? bot.pinned : false),
+        sectionId: bot.userPreferences[0]
+          ? bot.userPreferences[0].sectionId
+          : bot.userId === actor.userId
+            ? bot.sectionId
+            : null,
+        unread: bot.userPreferences[0]
+          ? bot.userPreferences[0].manualUnread ||
+            bot.thread.nextMessageSeq - 1 > bot.userPreferences[0].lastReadSeq
+          : bot.userId === actor.userId
+            ? bot.thread.unread
+            : bot.thread.nextMessageSeq > 0,
         parentBotId: bot.parentBotId,
         preview: previewFromBlocks(bot.thread.messages[0]?.blocks),
         status: activeRun?.status ?? "idle",
@@ -238,11 +275,10 @@ export function createRepos(
           ? await tx.bot.findFirst({
               where: {
                 id: input.botId,
-                spaceId: actor.spaceId,
-                userId: actor.userId,
+                ...accessibleBotWhere(actor),
                 archivedAt: null,
               },
-              select: { id: true },
+              select: { id: true, collaborationRestricted: true },
             })
           : await tx.chatGroup.findFirst({
               where: {
@@ -278,7 +314,20 @@ export function createRepos(
           },
         });
         if (input.botId) {
-          await tx.bot.update({ where: { id: target.id }, data: { sectionId: section.id } });
+          if ("collaborationRestricted" in target && target.collaborationRestricted) {
+            await tx.botUserPreference.upsert({
+              where: { botId_userId: { botId: target.id, userId: actor.userId } },
+              create: {
+                botId: target.id,
+                userId: actor.userId,
+                spaceId: actor.spaceId,
+                sectionId: section.id,
+              },
+              update: { sectionId: section.id },
+            });
+          } else {
+            await tx.bot.update({ where: { id: target.id }, data: { sectionId: section.id } });
+          }
         } else {
           await tx.chatGroup.update({
             where: { id: target.id },
@@ -352,7 +401,10 @@ export function createRepos(
       });
     },
 
-    async listBots(actor: Actor, options: { archived?: boolean } = {}): Promise<Bot[]> {
+    async listBots(
+      actor: Actor,
+      options: { archived?: boolean; accessible?: boolean } = {},
+    ): Promise<Bot[]> {
       const bots = await withNewestThreadMessages(
         prisma,
         await withLatestBotRuns(
@@ -360,7 +412,7 @@ export function createRepos(
           await prisma.bot.findMany({
             where: {
               spaceId: actor.spaceId,
-              userId: actor.userId,
+              ...(options.accessible ? accessibleBotWhere(actor) : { userId: actor.userId }),
               archivedAt: options.archived ? { not: null } : null,
             },
             include: {
@@ -372,6 +424,7 @@ export function createRepos(
           }),
         ),
         SIDEBAR_PREVIEW_MESSAGE_WINDOW,
+        (bot) => (bot.userId === actor.userId ? null : actor.userId),
       );
       const callThreadIds = capabilities.phoneCallsEnabled
         ? bots.flatMap((bot) => (bot.thread ? [bot.thread.id] : []))
@@ -462,7 +515,7 @@ export function createRepos(
             if (messages.length === 0) break;
           }
           const activeRun = primaryActiveRun(bot.runs);
-          return mapBot(
+          const mapped = mapBot(
             bot,
             preview,
             activeRun?.status ?? "idle",
@@ -474,11 +527,52 @@ export function createRepos(
                 : [],
             ),
           );
+          const collaborator = bot.userId !== actor.userId;
+          const preferences = options.accessible
+            ? await prisma.botUserPreference.findUnique({
+                where: { botId_userId: { botId: bot.id, userId: actor.userId } },
+              })
+            : null;
+          const membership = collaborator
+            ? await prisma.botCollaborator.findUnique({
+                where: { botId_userId: { botId: bot.id, userId: actor.userId } },
+              })
+            : null;
+          return {
+            ...mapped,
+            ownerUserId: bot.userId,
+            accessRole: collaborator ? ("collaborator" as const) : ("owner" as const),
+            canApprove: !collaborator || Boolean(membership?.canApprove),
+            collaborationRestricted: bot.collaborationRestricted,
+            ...(preferences
+              ? {
+                  pinned: preferences.pinned,
+                  sectionId: preferences.sectionId,
+                  notifyOnFinish: preferences.notifyOnFinish,
+                  autoSpeak: preferences.autoSpeak,
+                  unread:
+                    preferences.manualUnread ||
+                    (bot.thread?.nextMessageSeq ?? 0) - 1 > preferences.lastReadSeq,
+                }
+              : collaborator
+                ? {
+                    pinned: false,
+                    sectionId: null,
+                    notifyOnFinish: true,
+                    autoSpeak: false,
+                    unread: (bot.thread?.nextMessageSeq ?? 0) > 0,
+                  }
+                : {}),
+          };
         }),
       );
     },
 
     listSpaceBotsForSpaces,
+
+    getAccessibleBot(actor: Actor, botId: string, options: { includeArchived?: boolean } = {}) {
+      return getAccessibleBot(prisma, actor, botId, options);
+    },
 
     async getBot(actor: Actor, botId: string, options: { includeArchived?: boolean } = {}) {
       const bot = await prisma.bot.findFirst({

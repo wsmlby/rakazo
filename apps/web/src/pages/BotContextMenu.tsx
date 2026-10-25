@@ -22,7 +22,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-type ChatMenuTarget = Pick<Bot, "name" | "pinned" | "sectionId" | "unread">;
+type ChatMenuTarget = Pick<Bot, "name" | "pinned" | "sectionId" | "unread" | "accessRole">;
 
 /** A roster row's context menu content; `onClose` serves the lazy-load error fallback. */
 export function BotContextMenu({
@@ -99,28 +99,32 @@ export function BotContextMenu({
         {bot.unread ? <BellDot /> : <Bell />}
         {bot.unread ? t`Mark as Read` : t`Mark as Unread`}
       </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem onClick={onEdit}>
-        <Pencil />
-        {t`Edit Profile`}
-      </ContextMenuItem>
-      <ContextMenuItem onClick={onDuplicate}>
-        <Copy />
-        {t`Duplicate`}
-      </ContextMenuItem>
-      <ContextMenuSeparator />
-      <ContextMenuItem onClick={onClear}>
-        <Eraser />
-        {t`Clear conversation`}
-      </ContextMenuItem>
-      <ContextMenuItem onClick={onArchive}>
-        <Archive />
-        {t`Archive`}
-      </ContextMenuItem>
-      <ContextMenuItem variant="destructive" onClick={onDelete}>
-        <Trash2 />
-        {t`Delete`}
-      </ContextMenuItem>
+      {bot.accessRole !== "collaborator" ? (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={onEdit}>
+            <Pencil />
+            {t`Edit Profile`}
+          </ContextMenuItem>
+          <ContextMenuItem onClick={onDuplicate}>
+            <Copy />
+            {t`Duplicate`}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onClick={onClear}>
+            <Eraser />
+            {t`Clear conversation`}
+          </ContextMenuItem>
+          <ContextMenuItem onClick={onArchive}>
+            <Archive />
+            {t`Archive`}
+          </ContextMenuItem>
+          <ContextMenuItem variant="destructive" onClick={onDelete}>
+            <Trash2 />
+            {t`Delete`}
+          </ContextMenuItem>
+        </>
+      ) : null}
     </ContextMenuContent>
   );
 }

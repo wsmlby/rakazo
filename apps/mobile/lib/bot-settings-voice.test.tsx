@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   instructions: "",
   description: "",
   crossSpaceCommunication: false,
+  accessRole: undefined as "owner" | "collaborator" | undefined,
+  collaborationRestricted: false,
   focus: undefined as string | undefined,
   os: "ios",
   work: [] as unknown[],
@@ -87,6 +89,8 @@ vi.mock("./api", () => ({
         computerMode: "team",
         fleetManagement: false,
         crossSpaceCommunication: mocks.crossSpaceCommunication,
+        accessRole: mocks.accessRole,
+        collaborationRestricted: mocks.collaborationRestricted,
       };
     if (procedure === "scratchpad/list") return mocks.work;
     if (procedure === "memory/list") return mocks.docs;
@@ -340,6 +344,8 @@ describe("bot settings device voice menu", () => {
   let container: HTMLDivElement;
   beforeEach(() => {
     mocks.crossSpaceCommunication = false;
+    mocks.accessRole = undefined;
+    mocks.collaborationRestricted = false;
     vi.clearAllMocks();
     mocks.focus = undefined;
     mocks.instructions = "";
@@ -368,6 +374,25 @@ describe("bot settings device voice menu", () => {
     await expand();
   };
   const menu = () => container.querySelector('[data-menu="Device voice"]');
+
+  it("does not offer unavailable tool permissions on previously shared bots", async () => {
+    mocks.collaborationRestricted = true;
+    await render();
+    expect(container.querySelector('[aria-label="Manage the bots it creates"]')).toBeNull();
+    expect(
+      container.querySelector('[aria-label="Allow cross-space bot communication"]'),
+    ).toBeNull();
+  });
+
+  it("shows only personal notifications for collaborators", async () => {
+    mocks.accessRole = "collaborator";
+    await act(async () => root.render(<BotSettingsScreen />));
+    expect(container.textContent).toContain("Notifications");
+    expect(container.textContent).not.toContain("Sharing");
+    expect(container.querySelector('[aria-label="Advanced"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Edit avatar"]')).toBeNull();
+    expect(container.textContent).not.toContain("Clear conversation");
+  });
 
   it.each([false, true])("loads and saves cross-space communication: %s", async (enabled) => {
     mocks.crossSpaceCommunication = enabled;

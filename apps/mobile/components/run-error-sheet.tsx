@@ -54,7 +54,7 @@ export function RunErrorSheet({
 }: {
   details: string | null;
   onClose: () => void;
-  onConnection: () => void;
+  onConnection?: () => void;
   onModel?: () => void;
 }) {
   const { t, locale } = useI18n();
@@ -68,7 +68,7 @@ export function RunErrorSheet({
   const diagnostic = parseRunDiagnostic(error.details, locale);
   const explanation = runErrorExplanation(
     t,
-    error.recovery === "connection",
+    error.recovery === "connection" && !!onConnection,
     !!error.recovery && !!onModel,
   );
   const textStyle = { color: tokens.foreground, fontSize: 16, lineHeight: 24 };

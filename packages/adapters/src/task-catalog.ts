@@ -13,6 +13,7 @@ type TaskCatalogInput = {
   botId: string;
   userId: string;
   threadId?: string;
+  collaborationRestricted?: boolean;
   tools: readonly Pick<ConnectorTool, "name" | "description" | "readOnly">[];
 };
 
@@ -50,10 +51,12 @@ export async function taskCatalogFromTool(deps: TaskCatalogToolDeps, input: Task
       orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
       select: { id: true, name: true, goal: true, status: true },
     }),
-    listAgentSkillRecords(deps.prisma, {
-      spaceId: input.spaceId,
-      userId: input.userId,
-    }),
+    input.collaborationRestricted
+      ? Promise.resolve([])
+      : listAgentSkillRecords(deps.prisma, {
+          spaceId: input.spaceId,
+          userId: input.userId,
+        }),
   ]);
 
   const seenTools = new Set<string>();

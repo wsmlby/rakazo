@@ -368,6 +368,10 @@ describe("createRepos.listSpaceBotsForSpaces", () => {
     const findMany = vi.fn(async (_query: { where: unknown; select: Record<string, unknown> }) => [
       {
         id: "bot-2",
+        userId: actor.userId,
+        collaborators: [],
+        userPreferences: [],
+        collaborationRestricted: false,
         spaceId: "ws-2",
         name: "Support",
         title: "Customer support",
@@ -410,6 +414,10 @@ describe("createRepos.listSpaceBotsForSpaces", () => {
     await expect(repos.listSpaceBotsForSpaces(actor, ["ws-2"])).resolves.toEqual([
       {
         id: "bot-2",
+        ownerUserId: actor.userId,
+        accessRole: "owner",
+        canApprove: true,
+        collaborationRestricted: false,
         spaceId: "ws-2",
         name: "Support",
         title: "Customer support",
@@ -434,7 +442,13 @@ describe("createRepos.listSpaceBotsForSpaces", () => {
       }),
     );
     expect(query.where).toEqual(
-      expect.objectContaining({ spaceId: { in: ["ws-2"] }, userId: actor.userId }),
+      expect.objectContaining({
+        spaceId: { in: ["ws-2"] },
+        OR: [
+          { userId: actor.userId },
+          { collaborators: { some: { userId: actor.userId, spaceId: { in: ["ws-2"] } } } },
+        ],
+      }),
     );
     expect(query.select).not.toHaveProperty("description");
     expect(query.select).not.toHaveProperty("instructions");

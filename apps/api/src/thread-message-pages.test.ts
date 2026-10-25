@@ -1,10 +1,12 @@
 import type { PrismaClient } from "@rakazo/db";
 import { describe, expect, it, vi } from "vitest";
 import {
+  eventAudienceUserId,
   isBackgroundRun,
   isPeerRun,
   loadAllMessages,
   loadMessagePage,
+  ownerSeesCollaboratorEvent,
   shouldForwardBackgroundThreadEvent,
   shouldForwardPeerThreadEvent,
 } from "./thread-message-pages.js";
@@ -906,4 +908,80 @@ it("derives attachment metadata from a validated parent outside the loaded page"
   } as unknown as PrismaClient;
   const page = await loadMessagePage(prisma, "thread", undefined, 1);
   expect(page.messages[0]?.replyPreview).toEqual({ role: "user", text: "", attachment: image });
+});
+
+describe("private collaborator exchanges", () => {
+  const empty = (findMany = vi.fn(async () => [])) =>
+    ({
+      message: { findMany, findFirst: vi.fn(), count: vi.fn(async () => 0) },
+      run: { findMany: vi.fn(async () => []) },
+    }) as unknown as PrismaClient;
+
+  it.each([
+    ["a collaborator's own exchange", "user-2"],
+    ["the owner's own thread", null],
+  ])("reads only %s", async (_label, audienceUserId) => {
+    const findMany = vi.fn(async () => []);
+    await loadMessagePage(
+      empty(findMany),
+      "thread-1",
+      undefined,
+      10,
+      undefined,
+      false,
+      false,
+      audienceUserId,
+    );
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ audienceUserId }) }),
+    );
+  });
+
+  it("reads every message when no audience is given", async () => {
+    const findMany = vi.fn(async () => []);
+    await loadMessagePage(empty(findMany), "thread-1", undefined, 10);
+    expect(findMany.mock.calls[0]).toBeDefined();
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.not.objectContaining({ audienceUserId: expect.anything() }),
+      }),
+    );
+  });
+
+  it("assigns run events to the run's requester and message events to the stored message", async () => {
+    const runFind = vi.fn(async () => ({ userId: "owner", requesterUserId: "user-2" }));
+    const messageFind = vi.fn(async () => ({ audienceUserId: "user-3" }));
+    const prisma = {
+      run: { findUnique: runFind },
+      message: { findUnique: messageFind },
+    } as unknown as PrismaClient;
+    const cache = new Map<string, Promise<string | null>>();
+    await expect(eventAudienceUserId(prisma, { runId: "run-1", payload: {} }, cache)).resolves.toBe(
+      "user-2",
+    );
+    await expect(eventAudienceUserId(prisma, { runId: "run-1", payload: {} }, cache)).resolves.toBe(
+      "user-2",
+    );
+    expect(runFind).toHaveBeenCalledTimes(1);
+    await expect(
+      eventAudienceUserId(prisma, { payload: { messageId: "m-1" } }, cache),
+    ).resolves.toBe("user-3");
+    await expect(eventAudienceUserId(prisma, { payload: {} }, cache)).resolves.toBeNull();
+  });
+
+  it("treats the owner's own run, even with a requester, as the owner's exchange", async () => {
+    const prisma = {
+      run: { findUnique: vi.fn(async () => ({ userId: "owner", requesterUserId: "owner" })) },
+    } as unknown as PrismaClient;
+    await expect(
+      eventAudienceUserId(prisma, { runId: "run-1", payload: {} }, new Map()),
+    ).resolves.toBeNull();
+  });
+
+  it("lets owners keep run lifecycle signals but not collaborator content", () => {
+    expect(ownerSeesCollaboratorEvent({ type: "run.completed" })).toBe(true);
+    expect(ownerSeesCollaboratorEvent({ type: "computer.takeover.requested" })).toBe(true);
+    expect(ownerSeesCollaboratorEvent({ type: "thread.message.created" })).toBe(false);
+    expect(ownerSeesCollaboratorEvent({ type: "thread.progress" })).toBe(false);
+  });
 });

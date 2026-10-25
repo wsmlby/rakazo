@@ -122,16 +122,32 @@ function attachmentBlocks(blocks: MessageBlock[] | undefined) {
   );
 }
 
+export function conversationAttachmentWhere(context: {
+  userId: string;
+  botId?: string;
+  conversationOnly?: boolean;
+}) {
+  if (context.conversationOnly && !context.botId)
+    throw new Error("Shared attachments require an explicit bot");
+  return context.conversationOnly
+    ? {
+        botId: context.botId,
+        groupId: null,
+        bot: { userId: context.userId, collaborationRestricted: true },
+      }
+    : { userId: context.userId };
+}
+
 async function attachedArtifacts(
   prisma: PrismaClient,
   blocks: Array<Extract<MessageBlock, { kind: "file" | "image" }>>,
-  context: AdapterContext,
+  context: AdapterContext & { conversationOnly?: boolean },
 ) {
   const rows = await prisma.artifact.findMany({
     where: {
       id: { in: blocks.map((block) => block.artifactId) },
       spaceId: context.spaceId,
-      userId: context.userId,
+      ...conversationAttachmentWhere(context),
     },
   });
   return new Map(rows.map((row) => [row.id, row]));

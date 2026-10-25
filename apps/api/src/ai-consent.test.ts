@@ -1,15 +1,24 @@
 import type { Actor } from "@rakazo/contracts";
 import { AI_DISCLOSURE_VERSION } from "@rakazo/contracts";
+import { currentDbContext, runAsTenant } from "@rakazo/db";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("./thread-target.js", () => ({
-  resolveThreadTarget: async () => ({ kind: "bot", botId: "bot" }),
+  resolveThreadTarget: vi.fn(),
 }));
 
 import { aiConsentStatus, allowAiConsent } from "./ai-consent.js";
 import type { RouterDeps } from "./router.js";
+import { resolveThreadTarget } from "./thread-target.js";
 
 function setup() {
+  vi.mocked(resolveThreadTarget)
+    .mockReset()
+    .mockResolvedValue({
+      kind: "bot",
+      botId: "bot",
+      bot: { userId: "user", collaborationRestricted: false },
+    } as never);
   const upsert = vi.fn(async () => ({}));
   const deps = {
     env: { agentRuntime: "scripted" },
@@ -163,6 +172,241 @@ describe("consent grants", () => {
         },
       }),
     );
+  });
+});
+
+describe("shared bot consent", () => {
+  function sharedSetup() {
+    const fixture = setup();
+    fixture.deps.env.agentRuntime = "pi";
+    vi.mocked(resolveThreadTarget).mockResolvedValue({
+      kind: "bot",
+      botId: "bot",
+      bot: { userId: "owner", collaborationRestricted: true },
+    } as never);
+    vi.mocked(fixture.deps.prisma.bot.findMany).mockResolvedValue([
+      { modelProvider: null, modelId: null, thinkingLevel: null },
+    ] as never);
+    return fixture;
+  }
+
+  it("uses the owner's model connections and endpoint without returning secrets", async () => {
+    const { deps, actor } = sharedSetup();
+    vi.mocked(deps.prisma.bot.findMany).mockResolvedValue([
+      { modelProvider: "openai-compatible", modelId: "owner-model", thinkingLevel: null },
+    ] as never);
+    vi.mocked(deps.prisma.userModelCredential.findMany).mockImplementation(
+      async (input) =>
+        (input?.where?.userId === "owner"
+          ? [{ id: "owner-credential", provider: "openai-compatible", secretId: "owner-secret" }]
+          : [
+              { id: "viewer-credential", provider: "anthropic", secretId: "viewer-secret" },
+            ]) as never,
+    );
+    vi.mocked(deps.prisma.secret.findMany).mockResolvedValue([
+      { id: "owner-secret", ciphertext: "encrypted-fixture" },
+    ] as never);
+    deps.secrets = {
+      load: vi.fn().mockResolvedValue(
+        JSON.stringify({
+          kind: "openai_compatible",
+          baseUrl: "https://models.example.com/v1",
+          apiKey: "fixture-key",
+        }),
+      ),
+      put: vi.fn(),
+    };
+    const status = await aiConsentStatus(deps, actor, { botId: "bot", uses: ["model"] });
+    expect(status.recipients).toEqual([
+      expect.objectContaining({
+        name: expect.stringContaining("models.example.com"),
+        detail: "owner-model",
+        allowed: false,
+      }),
+    ]);
+    expect(deps.prisma.bot.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ userId: "owner" }) }),
+    );
+    expect(deps.prisma.secret.findMany).toHaveBeenCalledWith({
+      where: { userId: "owner", spaceId: null, id: { in: ["owner-secret"] } },
+    });
+    expect(deps.prisma.userModelCredential.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ userId: "owner" }) }),
+    );
+    expect(JSON.stringify(status)).not.toMatch(/fixture-key|ciphertext|owner-secret|viewer-secret/);
+    expect(actor.userId).toBe("user");
+  });
+
+  it("uses owner defaults, helpers and fallback models while reading only viewer consent", async () => {
+    const { deps, actor } = sharedSetup();
+    vi.mocked(deps.prisma.spaceModelPreference.findMany).mockImplementation(
+      async (input) =>
+        (input?.where?.userId === "owner"
+          ? [
+              {
+                modelId: "owner-helper",
+                isDefault: false,
+                credential: { provider: "google", secretId: "helper-secret" },
+              },
+            ]
+          : [{ modelId: "viewer-model", credential: { provider: "openai" } }]) as never,
+    );
+    vi.mocked(deps.prisma.spaceModelRoleChoice.findMany).mockResolvedValue([
+      { role: "main", position: 0, provider: "anthropic", modelId: "owner-main" },
+      { role: "main", position: 1, provider: "mistral", modelId: "owner-backup" },
+    ] as never);
+    vi.mocked(deps.prisma.userModelCredential.findMany).mockImplementation(
+      async (input) =>
+        (input?.where?.userId === "owner"
+          ? ["anthropic", "mistral"].map((provider) => ({
+              id: provider,
+              provider,
+              secretId: `${provider}-secret`,
+            }))
+          : []) as never,
+    );
+    const query = { botId: "bot", uses: ["model"] } as const;
+    const status = await aiConsentStatus(deps, actor, { ...query, uses: [...query.uses] });
+    expect(status.recipients.map((recipient) => recipient.detail)).toEqual(
+      expect.arrayContaining(["owner-main", "owner-backup", "owner-helper"]),
+    );
+    expect(status.recipients.every((recipient) => !recipient.allowed)).toBe(true);
+    expect(JSON.stringify(status)).not.toContain("viewer-model");
+    expect(deps.prisma.aiDataConsent.findMany).toHaveBeenCalledExactlyOnceWith({
+      where: { userId: actor.userId, spaceId: actor.spaceId, version: AI_DISCLOSURE_VERSION },
+    });
+    for (const call of vi.mocked(deps.prisma.spaceModelRoleChoice.findMany).mock.calls)
+      expect(call[0]?.where).toMatchObject({ userId: "owner", spaceId: actor.spaceId });
+    const recipient = status.recipients[0]!;
+    vi.mocked(deps.prisma.aiDataConsent.findMany).mockResolvedValue([
+      { recipientKey: recipient.key },
+    ] as never);
+    const allowed = await aiConsentStatus(deps, actor, { botId: "bot", uses: ["model"] });
+    expect(allowed.recipients.find((row) => row.key === recipient.key)?.allowed).toBe(true);
+  });
+
+  it("keeps deployment defaults and Space memory while voice still uses the viewer", async () => {
+    const { deps, actor } = sharedSetup();
+    deps.env.deploymentModelConfigured = true;
+    deps.env.defaultProvider = "openai";
+    deps.env.defaultModel = "deployment-model";
+    vi.mocked(deps.prisma.spaceMemoryConfig.findUnique).mockResolvedValue({
+      provider: "supermemory",
+      settings: { baseUrl: "https://memory.example.com" },
+    } as never);
+    const status = await aiConsentStatus(deps, actor, { botId: "bot" });
+    expect(status.recipients).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ use: "model", detail: "deployment-model" }),
+        expect.objectContaining({ use: "memory" }),
+        expect.objectContaining({ use: "voice", name: "OpenAI" }),
+      ]),
+    );
+    expect(deps.prisma.spaceMemoryConfig.findUnique).toHaveBeenCalledWith({
+      where: { spaceId: actor.spaceId },
+    });
+    expect(deps.prisma.spaceVoicePreference.findMany).toHaveBeenCalledWith({
+      where: { userId: actor.userId, spaceId: actor.spaceId },
+      include: { credential: true },
+    });
+  });
+
+  it("grants the target's recipients only to the viewer and rechecks target access", async () => {
+    const { deps, actor, upsert } = sharedSetup();
+    vi.mocked(deps.prisma.spaceModelPreference.findMany).mockResolvedValue([
+      { modelId: "owner-helper", credential: { provider: "anthropic" } },
+    ] as never);
+    const query = { botId: "bot", uses: ["model"] as const };
+    const status = await aiConsentStatus(deps, actor, { ...query, uses: [...query.uses] });
+    const input = {
+      scope: status.scope,
+      version: status.version,
+      keys: status.recipients.map((recipient) => recipient.key),
+      query: { ...query, uses: [...query.uses] },
+    };
+    const granted = await allowAiConsent(deps, actor, input);
+    expect(granted.recipients.every((recipient) => recipient.allowed)).toBe(true);
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: {
+          userId: actor.userId,
+          spaceId: actor.spaceId,
+          recipientKey: input.keys[0],
+          version: status.version,
+        },
+        where: {
+          userId_spaceId_recipientKey: {
+            userId: actor.userId,
+            spaceId: actor.spaceId,
+            recipientKey: input.keys[0],
+          },
+        },
+      }),
+    );
+    upsert.mockClear();
+    vi.mocked(resolveThreadTarget).mockRejectedValue(new Error("Access revoked"));
+    await expect(allowAiConsent(deps, actor, input)).rejects.toThrow("Access revoked");
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("limits the owner database context to model reads, not viewer consent or voice", async () => {
+    const { deps, actor, upsert } = sharedSetup();
+    const ownerContext = { kind: "tenant", userId: "owner", spaceId: actor.spaceId };
+    const viewerContext = { kind: "tenant", userId: actor.userId, spaceId: actor.spaceId };
+    vi.mocked(deps.prisma.spaceModelPreference.findMany).mockImplementation(async () => {
+      expect(currentDbContext()).toEqual(ownerContext);
+      return [
+        {
+          modelId: "owner-helper",
+          credential: { provider: "anthropic", secretId: "owner-secret" },
+        },
+      ] as never;
+    });
+    vi.mocked(deps.prisma.spaceModelRoleChoice.findMany).mockImplementation(async () => {
+      expect(currentDbContext()).toEqual(ownerContext);
+      return [];
+    });
+    vi.mocked(deps.prisma.secret.findMany).mockImplementation(async () => {
+      expect(currentDbContext()).toEqual(ownerContext);
+      return [];
+    });
+    vi.mocked(deps.prisma.aiDataConsent.findMany).mockImplementation(async () => {
+      expect(currentDbContext()).toEqual(viewerContext);
+      return [];
+    });
+    vi.mocked(deps.prisma.spaceVoicePreference.findMany).mockImplementation(async () => {
+      expect(currentDbContext()).toEqual(viewerContext);
+      return [];
+    });
+    upsert.mockImplementation(async () => {
+      expect(currentDbContext()).toEqual(viewerContext);
+      return {};
+    });
+    await runAsTenant(actor, async () => {
+      const query = { botId: "bot" };
+      const status = await aiConsentStatus(deps, actor, query);
+      await allowAiConsent(deps, actor, {
+        scope: status.scope,
+        version: status.version,
+        keys: status.recipients.map((recipient) => recipient.key),
+        query,
+      });
+      expect(currentDbContext()).toEqual(viewerContext);
+    });
+    expect(upsert).toHaveBeenCalledOnce();
+    expect(currentDbContext()).toBeUndefined();
+  });
+
+  it("preserves viewer-owned model scope for groups and untargeted settings", async () => {
+    const { deps, actor } = sharedSetup();
+    vi.mocked(resolveThreadTarget).mockResolvedValue({
+      kind: "group",
+      memberBotIds: ["bot"],
+    } as never);
+    for (const query of [{ groupId: "group", uses: ["model"] }, { uses: ["model"] }])
+      await aiConsentStatus(deps, actor, query as never);
+    for (const call of vi.mocked(deps.prisma.spaceModelPreference.findMany).mock.calls)
+      expect(call[0]?.where).toMatchObject({ userId: actor.userId, spaceId: actor.spaceId });
   });
 });
 
