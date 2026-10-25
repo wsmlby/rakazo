@@ -141,7 +141,6 @@ it("does not fetch or render sharing controls for a collaborator deep link", asy
 
 it("removes stale ownership controls when returning after ownership changes", async () => {
   await act(async () => root.render(<BotSharingScreen />));
-  expect(button("Company")).toBeDefined();
   mocks.rpc.mockResolvedValue({ accessRole: "collaborator" });
   await act(async () => mocks.foreground?.("active"));
   expect(container.querySelector("button")).toBeNull();

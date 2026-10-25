@@ -3796,7 +3796,6 @@ function SpaceShell() {
                 }}
                 focusModel={modelFocusRequest}
                 onOpenConnections={() => openSettings("models")}
-                onOpenCompany={() => openSettings("general")}
                 memoryProviderConfigured={memoryProviderConfig != null}
                 onSkillsChange={setAgentSkills}
                 onSave={async ({ computerMode, ...patch }) => {

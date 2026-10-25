@@ -66,7 +66,6 @@ export default function SettingsLayout() {
         }}
       />
       <Stack.Screen name="ai-data-sharing" options={glassHeaderOptions(t("AI data sharing"))} />
-      <Stack.Screen name="company-invitations" options={glassHeaderOptions(t("Company"))} />
       <Stack.Screen name="archived-bots" options={{ title: t("Archived") }} />
       <Stack.Screen name="change-password" options={{ title: t("Change password") }} />
       <Stack.Screen name="signup-survey" options={glassHeaderOptions(t("Welcome to Rakazo"))} />

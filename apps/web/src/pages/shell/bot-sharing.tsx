@@ -17,13 +17,11 @@ export function BotSharing({
   onChanged,
   computerMode,
   onUsePrivateComputer,
-  onOpenCompany,
 }: {
   botId: string;
   onChanged: (transferred?: boolean) => Promise<void>;
   computerMode?: ComputerMode;
   onUsePrivateComputer?: () => Promise<void>;
-  onOpenCompany?: () => void;
 }) {
   const { t } = useLingui();
   const [open, setOpen] = useState(false);
@@ -85,11 +83,6 @@ export function BotSharing({
             permanently disables tools. Replies use the owner’s model connection.
           </Trans>
         </p>
-        {onOpenCompany ? (
-          <Button variant="ghost" size="sm" onClick={onOpenCompany}>
-            <Trans>Company</Trans>
-          </Button>
-        ) : null}
         {computerMode === "team" ? (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
@@ -112,7 +105,7 @@ export function BotSharing({
           ) ? (
           <div className="flex gap-2">
             <NativeSelect
-              aria-label={t`Company member`}
+              aria-label={t`Member`}
               value={userId}
               onChange={(event) => setUserId(event.target.value)}
               disabled={busy}

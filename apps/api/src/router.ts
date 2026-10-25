@@ -288,7 +288,6 @@ import {
   listSpaceArtifacts,
 } from "./artifacts.js";
 import type { BillingService } from "./billing.js";
-import { companyInvitationResult, companyInvitationService } from "./company-invitations.js";
 import {
   executionBlocksUserTakeover,
   resolveBusyBotName,
@@ -1224,27 +1223,6 @@ export function createRouter(deps: RouterDeps) {
   };
 
   return os.router({
-    companyInvitations: {
-      capabilities: authed.companyInvitations.capabilities.handler(({ context }) =>
-        companyInvitationResult(companyInvitationService(deps.prisma).capabilities(context.actor)),
-      ),
-      create: authed.companyInvitations.create.handler(({ context }) =>
-        companyInvitationResult(companyInvitationService(deps.prisma).create(context.actor)),
-      ),
-      preview: authed.companyInvitations.preview.handler(({ input }) =>
-        companyInvitationResult(companyInvitationService(deps.prisma).preview(input.token)),
-      ),
-      accept: authed.companyInvitations.accept.handler(({ context, input }) =>
-        companyInvitationResult(
-          companyInvitationService(deps.prisma).accept(context.actor, input.token),
-        ),
-      ),
-      revoke: authed.companyInvitations.revoke.handler(({ context, input }) =>
-        companyInvitationResult(
-          companyInvitationService(deps.prisma).revoke(context.actor, input.invitationId),
-        ),
-      ),
-    },
     aiConsent: {
       status: authed.aiConsent.status.handler(({ context, input }) =>
         aiConsentStatus(deps, context.actor, input),

@@ -1020,17 +1020,8 @@ export const DE_MESSAGES: Record<string, string> = {
   "Bot connections and credentials are removed; routines are paused. Replies use the new owner’s model connection.":
     "Bot-Verbindungen und Zugangsdaten werden entfernt; Routinen werden pausiert. Antworten nutzen die Modellverbindung des neuen Eigentümers.",
   "Choose member": "Mitglied wählen",
-  Company: "Firma",
-  "Company member": "Firmenmitglied",
-  "Copy invitation": "Einladung kopieren",
-  "Invitation code": "Einladungscode",
-  "Invite member": "Mitglied einladen",
-  "Join company": "Firma beitreten",
   "Members can read all past and future messages and use this bot’s memory. Sharing permanently disables tools. Replies use the owner’s model connection.":
     "Mitglieder können alle vergangenen und künftigen Nachrichten lesen und das Gedächtnis dieses Bots nutzen. Durch das Teilen werden Tools dauerhaft deaktiviert. Antworten nutzen die Modellverbindung des Eigentümers.",
-  "Open company": "Firma öffnen",
-  "Preview invitation": "Einladung ansehen",
-  "Revoke invitation": "Einladung widerrufen",
   Sharing: "Teilen",
   "Sharing requires a private computer.": "Zum Teilen ist ein privater Computer erforderlich.",
   Transfer: "Übertragen",

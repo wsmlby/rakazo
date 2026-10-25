@@ -980,17 +980,8 @@ export const ZH_MESSAGES: Record<string, string> = {
   "Bot connections and credentials are removed; routines are paused. Replies use the new owner’s model connection.":
     "机器人的连接和凭据将被移除，例行任务将暂停。回复将使用新所有者的模型连接。",
   "Choose member": "选择成员",
-  Company: "公司",
-  "Company member": "公司成员",
-  "Copy invitation": "复制邀请",
-  "Invitation code": "邀请码",
-  "Invite member": "邀请成员",
-  "Join company": "加入公司",
   "Members can read all past and future messages and use this bot’s memory. Sharing permanently disables tools. Replies use the owner’s model connection.":
     "成员可以阅读所有过去和未来的消息，并使用此机器人的记忆。共享会永久禁用工具。回复将使用所有者的模型连接。",
-  "Open company": "打开公司",
-  "Preview invitation": "预览邀请",
-  "Revoke invitation": "撤销邀请",
   Sharing: "共享",
   "Sharing requires a private computer.": "共享需要私有计算机。",
   Transfer: "转让",

@@ -1017,17 +1017,8 @@ export const RU_MESSAGES: Record<string, string> = {
   "Bot connections and credentials are removed; routines are paused. Replies use the new owner’s model connection.":
     "Подключения и учётные данные бота удаляются; рутины приостанавливаются. Ответы используют подключение к модели нового владельца.",
   "Choose member": "Выбрать участника",
-  Company: "Компания",
-  "Company member": "Участник компании",
-  "Copy invitation": "Копировать приглашение",
-  "Invitation code": "Код приглашения",
-  "Invite member": "Пригласить участника",
-  "Join company": "Присоединиться к компании",
   "Members can read all past and future messages and use this bot’s memory. Sharing permanently disables tools. Replies use the owner’s model connection.":
     "Участники могут читать все прошлые и будущие сообщения и использовать память этого бота. Общий доступ навсегда отключает инструменты. Ответы используют подключение к модели владельца.",
-  "Open company": "Открыть компанию",
-  "Preview invitation": "Просмотреть приглашение",
-  "Revoke invitation": "Отозвать приглашение",
   Sharing: "Общий доступ",
   "Sharing requires a private computer.": "Для общего доступа нужен личный компьютер.",
   Transfer: "Передать",

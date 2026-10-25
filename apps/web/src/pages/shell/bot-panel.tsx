@@ -100,13 +100,11 @@ export function BotSettings({
   focusModel = 0,
   onOpenConnections,
   onSharingChanged,
-  onOpenCompany,
 }: {
   bot: Bot;
   focusModel?: number;
   onOpenConnections?: () => void;
   onSharingChanged?: (transferred?: boolean) => Promise<void>;
-  onOpenCompany?: () => void;
   onSkillsChange: (skills: AgentSkillCatalogEntry[]) => void;
   memoryProviderConfigured: boolean;
   onSave: (patch: {
@@ -144,7 +142,6 @@ export function BotSettings({
       focusModel={focusModel}
       onOpenConnections={onOpenConnections}
       onSharingChanged={onSharingChanged}
-      onOpenCompany={onOpenCompany}
     />
   );
 }
@@ -192,7 +189,6 @@ function OwnedBotSettings({
   focusModel = 0,
   onOpenConnections,
   onSharingChanged,
-  onOpenCompany,
 }: Parameters<typeof BotSettings>[0]) {
   const { t } = useLingui();
   const ids = useId();
@@ -613,7 +609,6 @@ function OwnedBotSettings({
       </section>
       <BotSharing
         botId={bot.id}
-        onOpenCompany={onOpenCompany}
         computerMode={bot.computerMode}
         onUsePrivateComputer={async () => {
           await onSave({ computerMode: "dedicated" });

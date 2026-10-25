@@ -405,6 +405,7 @@ import {
 } from "./run-secret.js";
 import {
   SHARED_BOT_COMPUTER_TOOLS,
+  sharedBotRunNote,
   sharedBotTaughtSkill,
   sharedBotToolAllowed,
   sharedBotToolError,
@@ -8030,7 +8031,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
         }
         const prompt = [
           conversationOnly
-            ? `This is a shared bot. Use only its bot memory, taught skills, routines, explicitly assigned credentials, and dedicated computer when attached. MCP tools are unavailable because their sessions are not bot-isolated. ${storedComputer ? "" : "No computer is attached; its owner must configure a replacement dedicated computer before computer work can resume. "}The owner configures policies and pays for execution; collaborators request work but cannot authorize configuration changes or owner-wide resources. Owner personal skills, accounts, shared memory, fleet, boards, and other bots' history are unavailable. Requester: ${JSON.stringify(messages.find((message) => message.id === run.sourceMessageId)?.authorName ?? run.requesterUserId ?? run.userId)}.`
+            ? sharedBotRunNote({
+                requester: String(
+                  messages.find((message) => message.id === run.sourceMessageId)?.authorName ??
+                    run.requesterUserId ??
+                    run.userId,
+                ),
+                requesterIsOwner: !run.requesterUserId || run.requesterUserId === run.userId,
+                hasComputer: Boolean(storedComputer),
+              })
             : undefined,
           replyContext,
           run.trigger === "reaction" && replyContext ? undefined : basePrompt,

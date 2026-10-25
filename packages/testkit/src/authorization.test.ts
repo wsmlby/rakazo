@@ -97,11 +97,6 @@ describeWithDatabase("API authorization and resource isolation", () => {
       ["spaces/create", { name: "Nope" }],
       ["spaces/rename", { spaceId: "missing-space", name: "Nope" }],
       ["spaces/remove", { spaceId: "missing-space" }],
-      ["companyInvitations/create", {}],
-      ["companyInvitations/capabilities"],
-      ["companyInvitations/preview", { token: "A".repeat(43) }],
-      ["companyInvitations/accept", { token: "A".repeat(43) }],
-      ["companyInvitations/revoke", { invitationId: "missing-invitation" }],
       ["bots/list"],
       ["bots/listArchived"],
       ["bots/get", { botId: "missing-bot" }],
@@ -515,7 +510,7 @@ describeWithDatabase("API authorization and resource isolation", () => {
     });
     await handles.prisma.member.create({
       data: {
-        id: `shared-company-member-${stamp}`,
+        id: `shared-org-member-${stamp}`,
         organizationId: space.organizationId,
         userId: coworkerActor.userId,
         role: "member",

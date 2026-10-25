@@ -211,7 +211,7 @@ rows, plus the user's own account-level credentials. A query that leaves out its
 returns nothing from other Spaces. A background job that acts for one run, routine, computer,
 skill, thread or cloud agent runs as that row's Space and user, so agent tools get the same
 backstop. Bot conversations additionally require ownership or an explicit collaboration grant;
-company membership alone is not enough. Shared-bot runs use the bot owner's execution context,
+space membership alone is not enough. Shared-bot runs use the bot owner's execution context,
 with requester attribution stored separately rather than selecting the sender's credentials.
 Security events are written and read only in system scope. Reconcilers, queue sweeps,
 the messaging outbox drain and webhooks run in a named system scope (`runAsSystem` in

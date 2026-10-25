@@ -58,7 +58,7 @@ Only the owner can change standing instructions or grant access and approval aut
 Files, browser sessions, and logged-in accounts on a workstation are available to the bots
 working there. A chat permission cannot isolate those resources. Sharing requires a
 dedicated, non-host bot computer; review its existing files and sessions before sharing.
-Company membership alone does not grant access to a bot.
+Space membership alone does not grant access to a bot.
 
 ## Supported versions
 

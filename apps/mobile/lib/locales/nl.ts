@@ -975,17 +975,8 @@ export const NL_MESSAGES: Record<string, string> = {
   "Bot connections and credentials are removed; routines are paused. Replies use the new owner’s model connection.":
     "Botverbindingen en inloggegevens worden verwijderd; routines worden gepauzeerd. Antwoorden gebruiken de modelverbinding van de nieuwe eigenaar.",
   "Choose member": "Lid kiezen",
-  Company: "Bedrijf",
-  "Company member": "Bedrijfslid",
-  "Copy invitation": "Uitnodiging kopiëren",
-  "Invitation code": "Uitnodigingscode",
-  "Invite member": "Lid uitnodigen",
-  "Join company": "Bedrijf toetreden",
   "Members can read all past and future messages and use this bot’s memory. Sharing permanently disables tools. Replies use the owner’s model connection.":
     "Leden kunnen alle eerdere en toekomstige berichten lezen en het geheugen van deze bot gebruiken. Delen schakelt tools permanent uit. Antwoorden gebruiken de modelverbinding van de eigenaar.",
-  "Open company": "Bedrijf openen",
-  "Preview invitation": "Uitnodiging bekijken",
-  "Revoke invitation": "Uitnodiging intrekken",
   Sharing: "Delen",
   "Sharing requires a private computer.": "Delen vereist een privécomputer.",
   Transfer: "Overdragen",

@@ -493,12 +493,6 @@ export default function Account() {
             onPress={editName}
           />
           {focus !== "usage" ? usageBlock : null}
-          <SettingsRow
-            accessibilityRole="button"
-            chevron="right"
-            title={t("Company")}
-            onPress={() => router.push("/company-invitations")}
-          />
         </SettingsGroup>
 
         {(security?.sso && !security.ssoLinked) || canChangePassword ? (

@@ -107,11 +107,6 @@ export default function BotSharingScreen() {
                 "Members can read all past and future messages and use this bot’s memory. Sharing permanently disables tools. Replies use the owner’s model connection.",
               )}
             </Text>
-            <NativeActionButton
-              label={t("Company")}
-              prominence="plain"
-              onPress={() => router.push("/company-invitations")}
-            />
             {computerMode === "team" ? (
               <SettingsGroup footer={t("Sharing requires a private computer.")}>
                 <SettingsRow
@@ -131,7 +126,7 @@ export default function BotSharingScreen() {
               ) ? (
               <SettingsGroup>
                 <MenuPicker
-                  label={t("Company member")}
+                  label={t("Member")}
                   value={userId}
                   choices={[
                     { key: "", label: t("Choose member") },

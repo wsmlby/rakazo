@@ -1744,20 +1744,3 @@ model SpaceModelRoleChoice {
   @@unique([spaceId, userId, role, provider, modelId])
   @@map("space_model_role_choices")
 }
-
-/// Product invitation capabilities. Foreign keys are maintained by the additive SQL migration.
-model CompanyInvitation {
-  id               String    @id
-  organizationId   String
-  spaceId          String
-  inviterUserId    String
-  tokenHash        String    @unique
-  createdAt        DateTime  @default(now())
-  expiresAt        DateTime
-  acceptedAt       DateTime?
-  acceptedByUserId String?
-  revokedAt        DateTime?
-
-  @@index([spaceId, expiresAt])
-  @@map("company_invitations")
-}

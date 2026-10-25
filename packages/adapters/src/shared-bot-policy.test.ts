@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  sharedBotRunNote,
   sharedBotTaughtSkill,
   sharedBotToolAllowed,
   sharedBotToolError,
@@ -103,5 +104,24 @@ describe("shared bot tool boundary", () => {
         connectorId: "mcp",
       }),
     ).toBeDefined();
+  });
+});
+
+describe("shared bot run note", () => {
+  it("labels the requester as collaborator or owner from server-side identity", () => {
+    const collaborator = sharedBotRunNote({
+      requester: "Sam",
+      requesterIsOwner: false,
+      hasComputer: true,
+    });
+    const owner = sharedBotRunNote({ requester: "Ada", requesterIsOwner: true, hasComputer: true });
+    expect(collaborator).toContain('Requester: "Sam" (a collaborator, not the owner).');
+    expect(owner).toContain('Requester: "Ada" (the owner).');
+  });
+
+  it("only mentions the missing computer when none is attached", () => {
+    const base = { requester: "Sam", requesterIsOwner: false };
+    expect(sharedBotRunNote({ ...base, hasComputer: true })).not.toContain("No computer");
+    expect(sharedBotRunNote({ ...base, hasComputer: false })).toContain("No computer");
   });
 });
