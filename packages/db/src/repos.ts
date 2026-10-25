@@ -214,7 +214,12 @@ export function createRepos(
       },
       orderBy: [{ pinned: "desc" }, { position: "asc" }, { createdAt: "asc" }],
     });
-    const bots = await withNewestThreadMessages(prisma, await withLatestBotRuns(prisma, rows), 1);
+    const bots = await withNewestThreadMessages(
+      prisma,
+      await withLatestBotRuns(prisma, rows),
+      1,
+      (bot) => (bot.userId === actor.userId ? null : actor.userId),
+    );
     return bots.map((bot) => {
       if (!bot.thread) throw new IsolationError("Bot is missing its thread");
       const activeRun = primaryActiveRun(bot.runs);
@@ -419,6 +424,7 @@ export function createRepos(
           }),
         ),
         SIDEBAR_PREVIEW_MESSAGE_WINDOW,
+        (bot) => (bot.userId === actor.userId ? null : actor.userId),
       );
       const callThreadIds = capabilities.phoneCallsEnabled
         ? bots.flatMap((bot) => (bot.thread ? [bot.thread.id] : []))

@@ -58,6 +58,8 @@ export type ThreadTarget =
       botId: string;
       threadId: string;
       bot: Awaited<ReturnType<ReturnType<typeof createRepos>["getBot"]>>;
+      /** The exchange this viewer reads: a collaborator's own, or the owner's (null). */
+      audienceUserId: string | null;
     }
   | {
       kind: "group";
@@ -305,6 +307,7 @@ export async function resolveThreadTarget(
       botId: bot.id,
       threadId: bot.thread.id,
       bot,
+      audienceUserId: bot.userId === actor.userId ? null : actor.userId,
     };
   }
   if (input.groupId) {
@@ -346,6 +349,10 @@ export async function threadSnapshot(
   // otherwise advance the client cursor past thread.message.created while the
   // ask message page still omits it — leaving waiting_input with no AskCard.
   if (target.kind === "bot") {
+    // A collaborator sees only the runs they requested; the owner sees them all.
+    const collaboratorRuns = target.audienceUserId
+      ? { requesterUserId: target.audienceUserId }
+      : {};
     const [busyBotName, core] = await Promise.all([
       resolveBusyBotName(deps.prisma, {
         computerId: target.bot.computer?.id,
@@ -356,7 +363,16 @@ export async function threadSnapshot(
         async (tx) => {
           await tx.$queryRaw`SELECT id FROM threads WHERE id = ${target.threadId} FOR SHARE`;
           const [messagePage, last, activeRuns, busyOrFailed] = await Promise.all([
-            loadMessagePage(tx, target.threadId, undefined, THREAD_MESSAGE_PAGE_SIZE),
+            loadMessagePage(
+              tx,
+              target.threadId,
+              undefined,
+              THREAD_MESSAGE_PAGE_SIZE,
+              undefined,
+              false,
+              false,
+              target.audienceUserId,
+            ),
             tx.event.findFirst({
               where: { threadId: target.threadId },
               orderBy: { seq: "desc" },
@@ -367,6 +383,7 @@ export async function threadSnapshot(
                 botId: target.botId,
                 threadId: target.threadId,
                 status: { in: [...ACTIVE_RUN_STATUSES] },
+                ...collaboratorRuns,
                 OR: [
                   { trigger: { notIn: [...BACKGROUND_RUN_TRIGGERS] } },
                   { status: { in: ["waiting_input", "waiting_takeover"] } },
@@ -380,6 +397,7 @@ export async function threadSnapshot(
                 threadId: target.threadId,
                 // Background ticket work stays silent; waiting is handled above.
                 trigger: { notIn: [...BACKGROUND_RUN_TRIGGERS] },
+                ...collaboratorRuns,
                 status: { in: [...ACTIVE_RUN_STATUSES, "failed"] },
               },
               // The id tiebreak keeps ordering deterministic under equal
@@ -402,6 +420,7 @@ export async function threadSnapshot(
                     threadId: target.threadId,
                     // Background failures must not bury a user-visible failure.
                     trigger: { notIn: [...BACKGROUND_RUN_TRIGGERS] },
+                    ...collaboratorRuns,
                     status: { in: ["failed", "completed", "cancelled"] },
                   },
                   orderBy: [{ createdAt: "desc" }, { id: "desc" }],

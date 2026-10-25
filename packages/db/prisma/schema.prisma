@@ -699,11 +699,14 @@ model Message {
   sourceRuns            Run[]             @relation("RunSourceMessage")
   externalTranscriptFor  ExternalMessage?
   steeringMessages SteeringMessage[]
+  /// The collaborator whose private exchange with the bot this message belongs to; null for the owner's own thread.
+  audienceUserId   String?
   createdAt        DateTime  @default(now())
 
   @@unique([threadId, seq])
   @@unique([threadId, clientNonce])
   @@index([threadId, seq])
+  @@index([threadId, audienceUserId, seq])
   @@index([replyToMessageId])
   @@index([searchTokens], type: Gin)
   @@map("messages")

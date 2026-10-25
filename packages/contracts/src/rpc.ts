@@ -415,6 +415,8 @@ export const appContract = {
           before: z.number().int().nonnegative().optional(),
           includePeerRuns: z.boolean().optional(),
           includePeerReceipts: z.boolean().optional(),
+          /** Owner only: read one collaborator's private exchange instead of the owner's own thread. */
+          collaboratorUserId: Id.optional(),
           around: z
             .object({
               messageId: Id.optional(),

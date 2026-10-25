@@ -323,10 +323,12 @@ import { withSerializableRetry } from "./serializable-retry.js";
 
 import { assertTeachingSendAllowed, createTaughtSkillsService } from "./taught-skills.js";
 import {
+  eventAudienceUserId,
   isBackgroundRun,
   isPeerRun,
   loadAllMessages,
   loadMessagePage,
+  ownerSeesCollaboratorEvent,
   shouldForwardBackgroundThreadEvent,
   shouldForwardPeerThreadEvent,
 } from "./thread-message-pages.js";
@@ -2681,12 +2683,18 @@ export function createRouter(deps: RouterDeps) {
           input.around,
           input.includePeerRuns,
           input.includePeerReceipts,
+          target.kind !== "bot"
+            ? undefined
+            : target.audienceUserId === null
+              ? (input.collaboratorUserId ?? null)
+              : target.audienceUserId,
         );
       }),
       subscribe: authed.threads.subscribe.handler(async function* ({ context, input }) {
         const target = await resolveThreadTarget(deps.prisma, context.actor, input);
         const peerRunCache = new Map<string, Promise<boolean>>();
         const backgroundRunCache = new Map<string, Promise<boolean>>();
+        const audienceCache = new Map<string, Promise<string | null>>();
         const follow = deps.events.follow(target.threadId, input.cursor, context.signal);
         // A half-open stream looks identical to an idle one, so punctuate silence:
         // the client treats any frame as liveness and reconnects once they stop.
@@ -2731,6 +2739,14 @@ export function createRouter(deps: RouterDeps) {
             const event = next.value;
             // Filtered peer events also restart the heartbeat, so check before skipping them.
             await assertStillAuthorized();
+            if (target.kind === "bot") {
+              const audience = await eventAudienceUserId(deps.prisma, event, audienceCache);
+              if (target.audienceUserId !== null) {
+                if (audience !== target.audienceUserId) continue;
+              } else if (audience !== null && !ownerSeesCollaboratorEvent(event)) {
+                continue;
+              }
+            }
             if (await isPeerRun(deps.prisma, event.runId, peerRunCache)) {
               if (!shouldForwardPeerThreadEvent(event)) continue;
             } else if (await isBackgroundRun(deps.prisma, event.runId, backgroundRunCache)) {

@@ -619,18 +619,38 @@ describeWithDatabase("API authorization and resource isolation", () => {
       task: { userId: ownerActor.userId, requesterUserId: coworkerActor.userId },
       sourceMessage: { authorUserId: coworkerActor.userId, authorName: "Coworker" },
     });
-    const snapshot = await rpc<{ messages: Array<{ id: string; authorUserId?: string }> }>(
-      app,
-      owner,
-      "threads/get",
-      { botId: shared.id },
+    type Page = { messages: Array<{ id: string; authorUserId?: string }> };
+    const requestMessageId = requestedRun.sourceMessage?.id;
+    // The request is the coworker's private exchange: the owner's own thread stays theirs,
+    // the owner reads it per collaborator, and the coworker reads only their own.
+    expect(
+      (await rpc<Page>(app, owner, "threads/get", { botId: shared.id })).messages,
+    ).not.toContainEqual(expect.objectContaining({ id: requestMessageId }));
+    expect(
+      (
+        await rpc<Page>(app, owner, "threads/messages", {
+          botId: shared.id,
+          collaboratorUserId: coworkerActor.userId,
+        })
+      ).messages,
+    ).toContainEqual(
+      expect.objectContaining({ id: requestMessageId, authorUserId: coworkerActor.userId }),
     );
-    expect(snapshot.messages).toContainEqual(
-      expect.objectContaining({
-        id: requestedRun.sourceMessage?.id,
-        authorUserId: coworkerActor.userId,
-      }),
-    );
+    expect(
+      (await rpc<Page>(app, coworker, "threads/get", { botId: shared.id }, space.id)).messages,
+    ).toEqual([expect.objectContaining({ id: requestMessageId })]);
+    // A collaborator cannot ask for another collaborator's exchange.
+    expect(
+      (
+        await rpc<Page>(
+          app,
+          coworker,
+          "threads/messages",
+          { botId: shared.id, collaboratorUserId: ownerActor.userId },
+          space.id,
+        )
+      ).messages,
+    ).toEqual([expect.objectContaining({ id: requestMessageId })]);
     await rpc(app, owner, "bots/sharing/grant", {
       botId: shared.id,
       userId: coworkerActor.userId,
