@@ -1,0 +1,12 @@
+__vite_ssr_exportName__("MIN_PASSWORD_LENGTH", () => { try { return MIN_PASSWORD_LENGTH } catch {} });
+__vite_ssr_exportName__("MAX_PASSWORD_LENGTH", () => { try { return MAX_PASSWORD_LENGTH } catch {} });
+__vite_ssr_exportName__("PASSWORD_RULES", () => { try { return PASSWORD_RULES } catch {} });
+/** Length limits for new passwords, with no composition rules (NIST SP 800-63B). */
+const MIN_PASSWORD_LENGTH = 8;
+const MAX_PASSWORD_LENGTH = 128;
+/** iOS AutoFill rules, so a generated password satisfies the server. */
+const PASSWORD_RULES = `minlength: ${MIN_PASSWORD_LENGTH}; maxlength: ${MAX_PASSWORD_LENGTH};`;
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7OztBQUNPLE1BQU0sc0JBQXNCO0FBQzVCLE1BQU0sc0JBQXNCOztBQUc1QixNQUFNLGlCQUFpQixjQUFjLG9CQUFvQixlQUFlLG9CQUFvQiIsIm5hbWVzIjpbXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZXMiOlsicGFzc3dvcmQtcG9saWN5LnRzIl0sInNvdXJjZXNDb250ZW50IjpbIi8qKiBMZW5ndGggbGltaXRzIGZvciBuZXcgcGFzc3dvcmRzLCB3aXRoIG5vIGNvbXBvc2l0aW9uIHJ1bGVzIChOSVNUIFNQIDgwMC02M0IpLiAqL1xuZXhwb3J0IGNvbnN0IE1JTl9QQVNTV09SRF9MRU5HVEggPSA4O1xuZXhwb3J0IGNvbnN0IE1BWF9QQVNTV09SRF9MRU5HVEggPSAxMjg7XG5cbi8qKiBpT1MgQXV0b0ZpbGwgcnVsZXMsIHNvIGEgZ2VuZXJhdGVkIHBhc3N3b3JkIHNhdGlzZmllcyB0aGUgc2VydmVyLiAqL1xuZXhwb3J0IGNvbnN0IFBBU1NXT1JEX1JVTEVTID0gYG1pbmxlbmd0aDogJHtNSU5fUEFTU1dPUkRfTEVOR1RIfTsgbWF4bGVuZ3RoOiAke01BWF9QQVNTV09SRF9MRU5HVEh9O2A7XG4iXSwiZmlsZSI6Ii9wYWNrYWdlcy9jb3JlL3NyYy9wYXNzd29yZC1wb2xpY3kudHMifQ==
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvY29yZS9zcmMvcGFzc3dvcmQtcG9saWN5LnRzIiwiL3BhY2thZ2VzL2NvcmUvc3JjL3Bhc3N3b3JkLXBvbGljeS50cyIsW11d

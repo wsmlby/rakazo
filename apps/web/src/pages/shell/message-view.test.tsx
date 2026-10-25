@@ -51,6 +51,8 @@ function renderMessage(
   blocks: ThreadMessage["blocks"],
   peerBot: PeerBot,
   mentions?: ReturnType<typeof planner>[],
+  messageOverrides?: Partial<ThreadMessage>,
+  canManageBot = true,
 ) {
   const onOpenBot = vi.fn();
   const message: ThreadMessage = {
@@ -60,6 +62,7 @@ function renderMessage(
     role: "bot",
     createdAt: new Date().toISOString(),
     blocks,
+    ...messageOverrides,
   };
   act(() =>
     root.render(
@@ -68,6 +71,7 @@ function renderMessage(
         canAnswer={false}
         canDismiss={false}
         message={message}
+        canManageBot={canManageBot}
         mentions={mentions}
         onAnswer={vi.fn()}
         onOpenBot={onOpenBot}
@@ -89,9 +93,33 @@ function renderMessage(
     ),
   );
   const mention = container.querySelector<HTMLElement>('[data-testid="bot-mention"]')!;
-  act(() => mention.click());
+  if (mention) act(() => mention.click());
   return { mention, onOpenBot };
 }
+
+it("labels human messages with their attributed sender", () => {
+  renderMessage([{ kind: "text", text: "Continue" }], missingBot, undefined, {
+    role: "user",
+    authorUserId: "member",
+    authorName: "Team Member",
+  });
+  expect(container.textContent).toContain("Team Member");
+});
+
+it("does not offer bot setup or computer controls to collaborators", () => {
+  renderMessage(
+    [
+      { kind: "computer", state: "Ready", text: "Ready" },
+      { kind: "choice", question: "Choose", options: [] },
+    ],
+    missingBot,
+    undefined,
+    undefined,
+    false,
+  );
+  expect(container.querySelector('[data-testid="computer-card"]')).toBeNull();
+  expect(container.textContent).not.toContain("Choose");
+});
 
 it("names a new bot inline in the reply, in its color", () => {
   const { mention, onOpenBot } = renderMessage(

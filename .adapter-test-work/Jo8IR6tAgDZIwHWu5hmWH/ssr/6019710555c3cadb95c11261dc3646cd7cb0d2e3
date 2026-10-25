@@ -1,0 +1,31 @@
+__vite_ssr_exportName__("messagingProviderName", () => { try { return messagingProviderName } catch {} });
+__vite_ssr_exportName__("messagingProviderLabel", () => { try { return messagingProviderLabel } catch {} });
+const PROVIDER_NAMES = {
+	sendblue: "iMessage",
+	slack: "Slack",
+	whatsapp: "WhatsApp",
+	telegram: "Telegram",
+	lark: "Feishu"
+};
+/** User-facing name of a messaging provider (falls back to the raw id). */
+function messagingProviderName(provider) {
+	// Extra named Telegram bots mount as "telegram-<name>".
+	const telegramBot = /^telegram-(.+)$/.exec(provider)?.[1];
+	if (telegramBot) return `Telegram (${telegramBot})`;
+	return PROVIDER_NAMES[provider] ?? provider;
+};
+/** Per-message provider label, narrowed to a recognized transport when available. */
+function messagingProviderLabel(provider, transport) {
+	if (provider === "sendblue" && [
+		"iMessage",
+		"SMS",
+		"RCS"
+	].includes(transport ?? "")) {
+		return transport;
+	};
+	return messagingProviderName(provider);
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7QUFBQSxNQUFNLGlCQUF5QztDQUM3QyxVQUFVO0NBQ1YsT0FBTztDQUNQLFVBQVU7Q0FDVixVQUFVO0NBQ1YsTUFBTTtBQUNSOztBQUdPLFNBQVMsc0JBQXNCLFVBQTBCOztDQUU5RCxNQUFNLGNBQWMsa0JBQWtCLEtBQUssUUFBUSxDQUFDLEdBQUc7Q0FDdkQsSUFBSSxhQUFhLE9BQU8sYUFBYSxZQUFZO0NBQ2pELE9BQU8sZUFBZSxhQUFhO0FBQ3JDOztBQUdPLFNBQVMsdUJBQXVCLFVBQWtCLFdBQTRCO0NBQ25GLElBQUksYUFBYSxjQUFjO0VBQUM7RUFBWTtFQUFPO0NBQUssQ0FBQyxDQUFDLFNBQVMsYUFBYSxFQUFFLEdBQUc7RUFDbkYsT0FBTztDQUNUO0NBQ0EsT0FBTyxzQkFBc0IsUUFBUTtBQUN2QyIsIm5hbWVzIjpbXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZXMiOlsibWVzc2FnaW5nLXByb3ZpZGVycy50cyJdLCJzb3VyY2VzQ29udGVudCI6WyJjb25zdCBQUk9WSURFUl9OQU1FUzogUmVjb3JkPHN0cmluZywgc3RyaW5nPiA9IHtcbiAgc2VuZGJsdWU6IFwiaU1lc3NhZ2VcIixcbiAgc2xhY2s6IFwiU2xhY2tcIixcbiAgd2hhdHNhcHA6IFwiV2hhdHNBcHBcIixcbiAgdGVsZWdyYW06IFwiVGVsZWdyYW1cIixcbiAgbGFyazogXCJGZWlzaHVcIixcbn07XG5cbi8qKiBVc2VyLWZhY2luZyBuYW1lIG9mIGEgbWVzc2FnaW5nIHByb3ZpZGVyIChmYWxscyBiYWNrIHRvIHRoZSByYXcgaWQpLiAqL1xuZXhwb3J0IGZ1bmN0aW9uIG1lc3NhZ2luZ1Byb3ZpZGVyTmFtZShwcm92aWRlcjogc3RyaW5nKTogc3RyaW5nIHtcbiAgLy8gRXh0cmEgbmFtZWQgVGVsZWdyYW0gYm90cyBtb3VudCBhcyBcInRlbGVncmFtLTxuYW1lPlwiLlxuICBjb25zdCB0ZWxlZ3JhbUJvdCA9IC9edGVsZWdyYW0tKC4rKSQvLmV4ZWMocHJvdmlkZXIpPy5bMV07XG4gIGlmICh0ZWxlZ3JhbUJvdCkgcmV0dXJuIGBUZWxlZ3JhbSAoJHt0ZWxlZ3JhbUJvdH0pYDtcbiAgcmV0dXJuIFBST1ZJREVSX05BTUVTW3Byb3ZpZGVyXSA/PyBwcm92aWRlcjtcbn1cblxuLyoqIFBlci1tZXNzYWdlIHByb3ZpZGVyIGxhYmVsLCBuYXJyb3dlZCB0byBhIHJlY29nbml6ZWQgdHJhbnNwb3J0IHdoZW4gYXZhaWxhYmxlLiAqL1xuZXhwb3J0IGZ1bmN0aW9uIG1lc3NhZ2luZ1Byb3ZpZGVyTGFiZWwocHJvdmlkZXI6IHN0cmluZywgdHJhbnNwb3J0Pzogc3RyaW5nKTogc3RyaW5nIHtcbiAgaWYgKHByb3ZpZGVyID09PSBcInNlbmRibHVlXCIgJiYgW1wiaU1lc3NhZ2VcIiwgXCJTTVNcIiwgXCJSQ1NcIl0uaW5jbHVkZXModHJhbnNwb3J0ID8/IFwiXCIpKSB7XG4gICAgcmV0dXJuIHRyYW5zcG9ydCE7XG4gIH1cbiAgcmV0dXJuIG1lc3NhZ2luZ1Byb3ZpZGVyTmFtZShwcm92aWRlcik7XG59XG4iXSwiZmlsZSI6Ii9wYWNrYWdlcy9jb3JlL3NyYy9tZXNzYWdpbmctcHJvdmlkZXJzLnRzIn0=
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvY29yZS9zcmMvbWVzc2FnaW5nLXByb3ZpZGVycy50cyIsIi9wYWNrYWdlcy9jb3JlL3NyYy9tZXNzYWdpbmctcHJvdmlkZXJzLnRzIixbXV0=

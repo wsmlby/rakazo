@@ -253,6 +253,8 @@ function toThreadMessage(row: {
   threadId: string;
   seq: number;
   role: string;
+  authorUserId?: string | null;
+  authorName?: string | null;
   blocks: Prisma.JsonValue;
   botId: string | null;
   replyToMessageId: string | null;
@@ -284,6 +286,8 @@ function toThreadMessage(row: {
     threadId: row.threadId,
     seq: row.seq,
     role: row.role as ThreadMessage["role"],
+    authorUserId: row.authorUserId ?? undefined,
+    authorName: row.authorName ?? undefined,
     blocks: row.blocks as ThreadMessage["blocks"],
     botId: row.botId ?? undefined,
     replyToMessageId: row.replyToMessageId ?? undefined,

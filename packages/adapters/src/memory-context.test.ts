@@ -13,6 +13,27 @@ const context: AdapterContext = {
 };
 
 describe("agent memory context", () => {
+  it("reads only this bot's durable memory for a shared bot", async () => {
+    const read = vi.fn(async () =>
+      snapshot([document("bot-fact", "MEMORY.md", "bot fact", 1, "2026-08-15T12:00:00.000Z")]),
+    );
+    const sharedContext = { ...context, collaborationRestricted: true };
+    const result = await loadAgentMemoryContext(storeWith(read), "bot-1", sharedContext);
+    expect(read).toHaveBeenCalledExactlyOnceWith({ scope: "bot", botId: "bot-1" }, sharedContext);
+    expect(result).toContain("bot fact");
+  });
+  it("never reads personal memory for permanently restricted shared bots", async () => {
+    const read = vi.fn(async () =>
+      snapshot([document("bot", "MEMORY.md", "Shared bot fact", 1, "2026-08-15T12:00:00.000Z")]),
+    );
+    const sharedContext = { ...context, conversationOnly: true };
+
+    const result = await loadAgentMemoryContext(storeWith(read), "bot-1", sharedContext);
+
+    expect(read).toHaveBeenCalledExactlyOnceWith({ scope: "bot", botId: "bot-1" }, sharedContext);
+    expect(result).toContain("Shared bot fact");
+  });
+
   it("loads bot and user memory and renders newest revisions first", async () => {
     const read = vi.fn(async ({ scope }: { scope: "bot" | "user" }) =>
       snapshot(

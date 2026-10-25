@@ -1,0 +1,27 @@
+__vite_ssr_exportName__("SANDBOXED_ARTIFACT_CSP", () => { try { return SANDBOXED_ARTIFACT_CSP } catch {} });
+__vite_ssr_exportName__("withSandboxedArtifactCsp", () => { try { return withSandboxedArtifactCsp } catch {} });
+// Same policy as the web preview: nothing loads from the network, so a script
+// cannot send what it reads to a remote image or font URL.
+const SANDBOXED_ARTIFACT_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'none'; base-uri 'none'";
+const PLAIN_HTML_DOCTYPE = /^\s*<!doctype\s+html\s*>/i;
+/**
+* Wraps bot-authored HTML with a restrictive CSP before it's handed to a
+* sandboxed viewer (a web iframe's `srcdoc`, or a native WebView's `source.html`).
+* The CSP alone isn't the isolation boundary — on web that's the iframe's
+* `sandbox="allow-scripts"` (no `allow-same-origin`); on native it's the
+* WebView never sharing the app's cookies/storage and being blocked from
+* navigating anywhere else. The CSP is a second layer on top: even within
+* that boundary, it blocks outbound network requests a script might still
+* attempt.
+*/
+function withSandboxedArtifactCsp(html) {
+	const meta = `<meta http-equiv="Content-Security-Policy" content="${SANDBOXED_ARTIFACT_CSP}">`;
+	const leadingDoctype = html.match(PLAIN_HTML_DOCTYPE);
+	if (!leadingDoctype) return `<!DOCTYPE html>${meta}${html}`;
+	const end = leadingDoctype[0].length;
+	return `${html.slice(0, end)}${meta}${html.slice(end)}`;
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7OztBQUVPLE1BQU0seUJBQ1g7QUFFRixNQUFNLHFCQUFxQjs7Ozs7Ozs7Ozs7QUFZcEIsU0FBUyx5QkFBeUIsTUFBc0I7Q0FDN0QsTUFBTSxPQUFPLHVEQUF1RCx1QkFBdUI7Q0FDM0YsTUFBTSxpQkFBaUIsS0FBSyxNQUFNLGtCQUFrQjtDQUNwRCxJQUFJLENBQUMsZ0JBQWdCLE9BQU8sa0JBQWtCLE9BQU87Q0FDckQsTUFBTSxNQUFNLGVBQWUsRUFBRSxDQUFDO0NBQzlCLE9BQU8sR0FBRyxLQUFLLE1BQU0sR0FBRyxHQUFHLElBQUksT0FBTyxLQUFLLE1BQU0sR0FBRztBQUN0RCIsIm5hbWVzIjpbXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZXMiOlsiYXJ0aWZhY3Qtc2FuZGJveC50cyJdLCJzb3VyY2VzQ29udGVudCI6WyIvLyBTYW1lIHBvbGljeSBhcyB0aGUgd2ViIHByZXZpZXc6IG5vdGhpbmcgbG9hZHMgZnJvbSB0aGUgbmV0d29yaywgc28gYSBzY3JpcHRcbi8vIGNhbm5vdCBzZW5kIHdoYXQgaXQgcmVhZHMgdG8gYSByZW1vdGUgaW1hZ2Ugb3IgZm9udCBVUkwuXG5leHBvcnQgY29uc3QgU0FOREJPWEVEX0FSVElGQUNUX0NTUCA9XG4gIFwiZGVmYXVsdC1zcmMgJ25vbmUnOyBzY3JpcHQtc3JjICd1bnNhZmUtaW5saW5lJzsgc3R5bGUtc3JjICd1bnNhZmUtaW5saW5lJzsgaW1nLXNyYyBkYXRhOjsgZm9udC1zcmMgZGF0YTo7IGZvcm0tYWN0aW9uICdub25lJzsgYmFzZS11cmkgJ25vbmUnXCI7XG5cbmNvbnN0IFBMQUlOX0hUTUxfRE9DVFlQRSA9IC9eXFxzKjwhZG9jdHlwZVxccytodG1sXFxzKj4vaTtcblxuLyoqXG4gKiBXcmFwcyBib3QtYXV0aG9yZWQgSFRNTCB3aXRoIGEgcmVzdHJpY3RpdmUgQ1NQIGJlZm9yZSBpdCdzIGhhbmRlZCB0byBhXG4gKiBzYW5kYm94ZWQgdmlld2VyIChhIHdlYiBpZnJhbWUncyBgc3JjZG9jYCwgb3IgYSBuYXRpdmUgV2ViVmlldydzIGBzb3VyY2UuaHRtbGApLlxuICogVGhlIENTUCBhbG9uZSBpc24ndCB0aGUgaXNvbGF0aW9uIGJvdW5kYXJ5IOKAlCBvbiB3ZWIgdGhhdCdzIHRoZSBpZnJhbWUnc1xuICogYHNhbmRib3g9XCJhbGxvdy1zY3JpcHRzXCJgIChubyBgYWxsb3ctc2FtZS1vcmlnaW5gKTsgb24gbmF0aXZlIGl0J3MgdGhlXG4gKiBXZWJWaWV3IG5ldmVyIHNoYXJpbmcgdGhlIGFwcCdzIGNvb2tpZXMvc3RvcmFnZSBhbmQgYmVpbmcgYmxvY2tlZCBmcm9tXG4gKiBuYXZpZ2F0aW5nIGFueXdoZXJlIGVsc2UuIFRoZSBDU1AgaXMgYSBzZWNvbmQgbGF5ZXIgb24gdG9wOiBldmVuIHdpdGhpblxuICogdGhhdCBib3VuZGFyeSwgaXQgYmxvY2tzIG91dGJvdW5kIG5ldHdvcmsgcmVxdWVzdHMgYSBzY3JpcHQgbWlnaHQgc3RpbGxcbiAqIGF0dGVtcHQuXG4gKi9cbmV4cG9ydCBmdW5jdGlvbiB3aXRoU2FuZGJveGVkQXJ0aWZhY3RDc3AoaHRtbDogc3RyaW5nKTogc3RyaW5nIHtcbiAgY29uc3QgbWV0YSA9IGA8bWV0YSBodHRwLWVxdWl2PVwiQ29udGVudC1TZWN1cml0eS1Qb2xpY3lcIiBjb250ZW50PVwiJHtTQU5EQk9YRURfQVJUSUZBQ1RfQ1NQfVwiPmA7XG4gIGNvbnN0IGxlYWRpbmdEb2N0eXBlID0gaHRtbC5tYXRjaChQTEFJTl9IVE1MX0RPQ1RZUEUpO1xuICBpZiAoIWxlYWRpbmdEb2N0eXBlKSByZXR1cm4gYDwhRE9DVFlQRSBodG1sPiR7bWV0YX0ke2h0bWx9YDtcbiAgY29uc3QgZW5kID0gbGVhZGluZ0RvY3R5cGVbMF0ubGVuZ3RoO1xuICByZXR1cm4gYCR7aHRtbC5zbGljZSgwLCBlbmQpfSR7bWV0YX0ke2h0bWwuc2xpY2UoZW5kKX1gO1xufVxuIl0sImZpbGUiOiIvcGFja2FnZXMvY29yZS9zcmMvYXJ0aWZhY3Qtc2FuZGJveC50cyJ9
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvY29yZS9zcmMvYXJ0aWZhY3Qtc2FuZGJveC50cyIsIi9wYWNrYWdlcy9jb3JlL3NyYy9hcnRpZmFjdC1zYW5kYm94LnRzIixbXV0=

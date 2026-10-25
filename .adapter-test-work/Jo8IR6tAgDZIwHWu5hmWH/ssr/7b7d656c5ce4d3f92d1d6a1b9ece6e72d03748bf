@@ -1,0 +1,24 @@
+__vite_ssr_exportName__("EmulatorBrowserProvider", () => { try { return EmulatorBrowserProvider } catch {} });
+const __vite_ssr_import_0__ = await __vite_ssr_import__("/packages/adapters/src/fake-browser.ts", {"importedNames":["FakeBrowserProvider"]});
+
+/**
+* Offline emulator for the page-browser adapter slot. Same behavior as fake;
+* distinct id so conformance can cover the emulator path without a hosted
+* browser vendor or Playwright/Puppeteer product dependency.
+*/
+const FakeBrowserProvider = __vite_ssr_import_0__.FakeBrowserProvider;
+class EmulatorBrowserProvider extends FakeBrowserProvider {
+	constructor(options = {}) {
+		super(options);
+	}
+	describe() {
+		return {
+			...super.describe(),
+			id: "emulator"
+		};
+	}
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTtBQUFBOzs7Ozs7OztBQU9PLE1BQU0sZ0NBQWdDLG9CQUFvQjtDQUMvRCxZQUFZLFVBQXNDLENBQUMsR0FBRztFQUNwRCxNQUFNLE9BQU87Q0FDZjtDQUVBLFFBQVMsR0FBVztFQUNsQixPQUFPO0dBQ0wsR0FBRyxNQUFNLFNBQVM7R0FDbEIsSUFBSTtFQUNOO0NBQ0Y7QUFDRiIsIm5hbWVzIjpbXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZXMiOlsiYnJvd3Nlci1lbXVsYXRvci50cyJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgeyBGYWtlQnJvd3NlclByb3ZpZGVyLCB0eXBlIEZha2VCcm93c2VyUHJvdmlkZXJPcHRpb25zIH0gZnJvbSBcIi4vZmFrZS1icm93c2VyLmpzXCI7XG5cbi8qKlxuICogT2ZmbGluZSBlbXVsYXRvciBmb3IgdGhlIHBhZ2UtYnJvd3NlciBhZGFwdGVyIHNsb3QuIFNhbWUgYmVoYXZpb3IgYXMgZmFrZTtcbiAqIGRpc3RpbmN0IGlkIHNvIGNvbmZvcm1hbmNlIGNhbiBjb3ZlciB0aGUgZW11bGF0b3IgcGF0aCB3aXRob3V0IGEgaG9zdGVkXG4gKiBicm93c2VyIHZlbmRvciBvciBQbGF5d3JpZ2h0L1B1cHBldGVlciBwcm9kdWN0IGRlcGVuZGVuY3kuXG4gKi9cbmV4cG9ydCBjbGFzcyBFbXVsYXRvckJyb3dzZXJQcm92aWRlciBleHRlbmRzIEZha2VCcm93c2VyUHJvdmlkZXIge1xuICBjb25zdHJ1Y3RvcihvcHRpb25zOiBGYWtlQnJvd3NlclByb3ZpZGVyT3B0aW9ucyA9IHt9KSB7XG4gICAgc3VwZXIob3B0aW9ucyk7XG4gIH1cblxuICBvdmVycmlkZSBkZXNjcmliZSgpIHtcbiAgICByZXR1cm4ge1xuICAgICAgLi4uc3VwZXIuZGVzY3JpYmUoKSxcbiAgICAgIGlkOiBcImVtdWxhdG9yXCIsXG4gICAgfTtcbiAgfVxufVxuIl0sImZpbGUiOiIvcGFja2FnZXMvYWRhcHRlcnMvc3JjL2Jyb3dzZXItZW11bGF0b3IudHMifQ==
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvYWRhcHRlcnMvc3JjL2Jyb3dzZXItZW11bGF0b3IudHMiLCIvcGFja2FnZXMvYWRhcHRlcnMvc3JjL2Jyb3dzZXItZW11bGF0b3IudHMiLFtdXQ==

@@ -31,6 +31,8 @@ export function loadRunHistoryMessages(
       threadId: true,
       seq: true,
       role: true,
+      authorUserId: true,
+      authorName: true,
       botId: true,
       runId: true,
       blocks: true,
@@ -55,6 +57,8 @@ export function isPartialReplyClientNonce(clientNonce: string | null | undefined
 export interface CreateThreadMessageInput {
   threadId: string;
   role: "user" | "bot" | "system";
+  authorUserId?: string;
+  authorName?: string;
   blocks: MessageBlock[];
   botId?: string;
   replyToMessageId?: string;
@@ -92,6 +96,8 @@ export async function createThreadMessageInTransaction(
       threadId: input.threadId,
       seq: thread.nextMessageSeq - 1,
       role: input.role,
+      authorUserId: input.authorUserId,
+      authorName: input.authorName,
       blocks: input.blocks as Prisma.InputJsonValue,
       botId: input.botId,
       replyToMessageId: input.replyToMessageId,

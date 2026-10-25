@@ -364,7 +364,8 @@ export async function speakUtterance(
     uses: ["voice"],
     status: () => rpc("aiConsent/status", { uses: ["voice"] }, { requestContext }),
     prompt: promptAiConsent,
-    allow: (input) => rpc("aiConsent/allow", input, { requestContext }),
+    allow: (input) =>
+      rpc("aiConsent/allow", { ...input, query: { uses: ["voice"] } }, { requestContext }),
     coalesceKey: aiConsentCoalesceKey(requestContext),
   });
   return renderUtterance(text, opts, requestContext);

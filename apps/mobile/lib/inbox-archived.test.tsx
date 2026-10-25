@@ -306,7 +306,7 @@ describe("thread menu archive notifications", () => {
     thread.indexOf("  function showBotActions()"),
   );
 
-  function setup() {
+  function setup(collaborator = false) {
     const rpc = vi.fn();
     const notify = vi.fn();
     const leave = vi.fn();
@@ -319,7 +319,7 @@ describe("thread menu archive notifications", () => {
       "confirmDeleteBot",
       "Alert",
       compile(`
-        const readOnly = false, botId = "bot-b", displayName = "Bot";
+        const readOnly = false, botId = "bot-b", displayName = "Bot", collaborator = ${collaborator};
         const t = text => text, openBotComputer = () => {}, clearConversation = () => {};
         const router = { push() {} }, errorText = () => "failure";
         ${actionsSource}
@@ -328,6 +328,10 @@ describe("thread menu archive notifications", () => {
     )(rpc, notify, leave, confirmDeleteBot, { alert }) as { text: string; onPress: () => void }[];
     return { rpc, notify, leave, confirmDeleteBot, alert, actions };
   }
+
+  it("omits computer, clear, archive and delete actions for collaborators", () => {
+    expect(setup(true).actions.map((action) => action.text)).toEqual(["Profile", "Chat settings"]);
+  });
 
   it("notifies only after archive succeeds, including while the inbox stays mounted", async () => {
     const h = setup();

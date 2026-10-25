@@ -1153,6 +1153,7 @@ describe("mobile API authentication", () => {
   it("records mobile consent before submitting and uses the deployment policy URL", async () => {
     vi.mocked(promptAiConsent).mockResolvedValue(true);
     const calls: string[] = [];
+    const consentBodies: unknown[] = [];
     const recipient = {
       key: "provider",
       name: "Example AI",
@@ -1162,9 +1163,11 @@ describe("mobile API authentication", () => {
     };
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (url) => {
+      vi.fn(async (url, init) => {
         const path = new URL(String(url)).pathname;
         calls.push(path);
+        if (path.startsWith("/rpc/aiConsent/"))
+          consentBodies.push(JSON.parse(String(init?.body)).json);
         return jsonResponse({
           json: path.endsWith("/status")
             ? {
@@ -1180,6 +1183,15 @@ describe("mobile API authentication", () => {
     await rpc("threads/send", { botId: "bot-1", text: "authorized content" });
     expect(calls).toEqual(["/rpc/aiConsent/status", "/rpc/aiConsent/allow", "/rpc/threads/send"]);
     expect(promptAiConsent).toHaveBeenLastCalledWith(recipient, "https://example.com/privacy");
+    expect(consentBodies).toEqual([
+      { uses: ["model", "memory"], botId: "bot-1" },
+      {
+        scope: "account-space",
+        version: "2026-09-14",
+        keys: ["provider"],
+        query: { uses: ["model", "memory"], botId: "bot-1" },
+      },
+    ]);
   });
 
   it("coalesces concurrent mobile consent checks before sending each request once", async () => {
@@ -3019,6 +3031,31 @@ describe("discarded mobile thread refresh cursor", () => {
 });
 
 describe("mobile thread event reduction", () => {
+  it("preserves human attribution through live message updates", () => {
+    const created = applyMobileThreadEvent(snapshot([]), {
+      type: "thread.message.created",
+      payload: {
+        messageId: "shared-message",
+        role: "user",
+        authorUserId: "member",
+        authorName: "Team Member",
+        blocks: [{ kind: "text", text: "Continue" }],
+      },
+    });
+    const updated = applyMobileThreadEvent(created, {
+      type: "thread.message.updated",
+      payload: {
+        messageId: "shared-message",
+        role: "user",
+        blocks: [{ kind: "text", text: "Updated" }],
+      },
+    });
+    expect(updated?.messages[0]).toMatchObject({
+      authorUserId: "member",
+      authorName: "Team Member",
+    });
+  });
+
   it("appends an emoji reply with its exact target", () => {
     const initial = snapshot([mobileMessage("message-1", [{ kind: "text", text: "Done" }])]);
 

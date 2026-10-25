@@ -77,7 +77,7 @@ export const Composer = memo(function Composer({
   pendingAttachments: PendingAttachment[];
   attachmentNotice: string | null;
   sendError: string | null;
-  onOpenModels: () => void;
+  onOpenModels?: () => void;
   runError: string | null;
   runErrorId: string | null;
   onRunErrorPresented: (runId: string) => void;

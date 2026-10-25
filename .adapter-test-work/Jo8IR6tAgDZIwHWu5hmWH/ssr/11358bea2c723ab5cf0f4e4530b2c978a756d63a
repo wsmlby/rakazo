@@ -1,0 +1,35 @@
+__vite_ssr_exportName__("SandboxRateLimitError", () => { try { return SandboxRateLimitError } catch {} });
+__vite_ssr_exportName__("SandboxUnresponsiveError", () => { try { return SandboxUnresponsiveError } catch {} });
+__vite_ssr_exportName__("SandboxUnavailableError", () => { try { return SandboxUnavailableError } catch {} });
+const __vite_ssr_import_0__ = await __vite_ssr_import__("/packages/contracts/src/index.ts", {"importedNames":["COMPUTER_RATE_LIMIT_ERROR"]});
+
+/** The sandbox provider refused the request because an account rate limit or quota was hit. */
+class SandboxRateLimitError extends Error {
+	code = "SANDBOX_RATE_LIMITED";
+	constructor(options) {
+		super((0,__vite_ssr_import_0__.COMPUTER_RATE_LIMIT_ERROR), options);
+		this.name = "SandboxRateLimitError";
+	}
+};
+/**
+* The sandbox took a request but did not answer before the provider gave up on it. It is not
+* resent; background work skips this attempt and tries again later.
+*/
+class SandboxUnresponsiveError extends Error {
+	constructor(message, options) {
+		super(message, options);
+		this.name = "SandboxUnresponsiveError";
+	}
+};
+/** The provider accepted the start but did not bring the computer up in time; a retry may work. */
+class SandboxUnavailableError extends Error {
+	code = "SANDBOX_UNAVAILABLE";
+	constructor(options) {
+		super("The computer did not start. Try again.", options);
+		this.name = "SandboxUnavailableError";
+	}
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7O0FBQUE7OztBQUdPLE1BQU0sOEJBQThCLE1BQU07Q0FDL0MsSUFBUyxHQUFPO0NBQ2hCLFlBQVksU0FBK0I7RUFDekMsU0FBTSxrREFBMkIsT0FBTztFQUN4QyxLQUFLLE9BQU87Q0FDZDtBQUNGOzs7OztBQU1PLE1BQU0saUNBQWlDLE1BQU07Q0FDbEQsWUFBWSxTQUFpQixTQUErQjtFQUMxRCxNQUFNLFNBQVMsT0FBTztFQUN0QixLQUFLLE9BQU87Q0FDZDtBQUNGOztBQUdPLE1BQU0sZ0NBQWdDLE1BQU07Q0FDakQsSUFBUyxHQUFPO0NBQ2hCLFlBQVksU0FBK0I7RUFDekMsTUFBTSwwQ0FBMEMsT0FBTztFQUN2RCxLQUFLLE9BQU87Q0FDZDtBQUNGIiwibmFtZXMiOltdLCJpZ25vcmVMaXN0IjpbXSwic291cmNlcyI6WyJzYW5kYm94LWVycm9ycy50cyJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgeyBDT01QVVRFUl9SQVRFX0xJTUlUX0VSUk9SIH0gZnJvbSBcIkByYWthem8vY29udHJhY3RzXCI7XG5cbi8qKiBUaGUgc2FuZGJveCBwcm92aWRlciByZWZ1c2VkIHRoZSByZXF1ZXN0IGJlY2F1c2UgYW4gYWNjb3VudCByYXRlIGxpbWl0IG9yIHF1b3RhIHdhcyBoaXQuICovXG5leHBvcnQgY2xhc3MgU2FuZGJveFJhdGVMaW1pdEVycm9yIGV4dGVuZHMgRXJyb3Ige1xuICByZWFkb25seSBjb2RlID0gXCJTQU5EQk9YX1JBVEVfTElNSVRFRFwiO1xuICBjb25zdHJ1Y3RvcihvcHRpb25zPzogeyBjYXVzZT86IHVua25vd24gfSkge1xuICAgIHN1cGVyKENPTVBVVEVSX1JBVEVfTElNSVRfRVJST1IsIG9wdGlvbnMpO1xuICAgIHRoaXMubmFtZSA9IFwiU2FuZGJveFJhdGVMaW1pdEVycm9yXCI7XG4gIH1cbn1cblxuLyoqXG4gKiBUaGUgc2FuZGJveCB0b29rIGEgcmVxdWVzdCBidXQgZGlkIG5vdCBhbnN3ZXIgYmVmb3JlIHRoZSBwcm92aWRlciBnYXZlIHVwIG9uIGl0LiBJdCBpcyBub3RcbiAqIHJlc2VudDsgYmFja2dyb3VuZCB3b3JrIHNraXBzIHRoaXMgYXR0ZW1wdCBhbmQgdHJpZXMgYWdhaW4gbGF0ZXIuXG4gKi9cbmV4cG9ydCBjbGFzcyBTYW5kYm94VW5yZXNwb25zaXZlRXJyb3IgZXh0ZW5kcyBFcnJvciB7XG4gIGNvbnN0cnVjdG9yKG1lc3NhZ2U6IHN0cmluZywgb3B0aW9ucz86IHsgY2F1c2U/OiB1bmtub3duIH0pIHtcbiAgICBzdXBlcihtZXNzYWdlLCBvcHRpb25zKTtcbiAgICB0aGlzLm5hbWUgPSBcIlNhbmRib3hVbnJlc3BvbnNpdmVFcnJvclwiO1xuICB9XG59XG5cbi8qKiBUaGUgcHJvdmlkZXIgYWNjZXB0ZWQgdGhlIHN0YXJ0IGJ1dCBkaWQgbm90IGJyaW5nIHRoZSBjb21wdXRlciB1cCBpbiB0aW1lOyBhIHJldHJ5IG1heSB3b3JrLiAqL1xuZXhwb3J0IGNsYXNzIFNhbmRib3hVbmF2YWlsYWJsZUVycm9yIGV4dGVuZHMgRXJyb3Ige1xuICByZWFkb25seSBjb2RlID0gXCJTQU5EQk9YX1VOQVZBSUxBQkxFXCI7XG4gIGNvbnN0cnVjdG9yKG9wdGlvbnM/OiB7IGNhdXNlPzogdW5rbm93biB9KSB7XG4gICAgc3VwZXIoXCJUaGUgY29tcHV0ZXIgZGlkIG5vdCBzdGFydC4gVHJ5IGFnYWluLlwiLCBvcHRpb25zKTtcbiAgICB0aGlzLm5hbWUgPSBcIlNhbmRib3hVbmF2YWlsYWJsZUVycm9yXCI7XG4gIH1cbn1cbiJdLCJmaWxlIjoiL3BhY2thZ2VzL2FkYXB0ZXIta2l0L3NyYy9zYW5kYm94LWVycm9ycy50cyJ9
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvYWRhcHRlci1raXQvc3JjL3NhbmRib3gtZXJyb3JzLnRzIiwiL3BhY2thZ2VzL2FkYXB0ZXIta2l0L3NyYy9zYW5kYm94LWVycm9ycy50cyIsW11d

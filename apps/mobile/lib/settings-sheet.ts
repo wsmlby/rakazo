@@ -11,6 +11,7 @@ const settingsScreens = new Set([
   "ai-data-sharing",
   "archived-bots",
   "change-password",
+  "company-invitations",
   "integration-setup",
   "integrations",
   "language",

@@ -786,6 +786,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
     [groupId, inGroup, mentionBots, mentionConnectors, mentionGroups, mentionRoutines],
   );
   const currentBot = botId ? mentionBots.find((bot) => bot.id === botId) : undefined;
+  const collaborator = currentBot?.accessRole === "collaborator";
   const displayName = safeDisplayName(currentBot?.name ?? name, inGroup ? t("Group") : t("Bot"));
   const composerPrompt = displayName ? t("Message {name}", { name: displayName }) : t("Message…");
   const notificationThreadId = snap?.threadId ?? requestedThreadId ?? currentBot?.threadId;
@@ -817,6 +818,11 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
   // card is the state: no typing dots under it.
   const workingGroupBots = activeGroupBots.filter((bot) => isRunWorking(bot.status));
   const working = inGroup ? activeGroupBots.length > 0 : isActiveStatus(currentBotStatus);
+  const composerWorking = collaborator
+    ? (snap?.activeRuns ?? (snap?.run ? [snap.run] : [])).some(
+        (run) => run.status === "queued" && Boolean(userId) && run.requesterUserId === userId,
+      )
+    : working;
 
   const speakFinishedReply = useCallback(() => {
     if (!botId || inGroup || !currentBot) return;
@@ -1140,7 +1146,9 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
   }
 
   const botActions = [
-    ...(!readOnly && botId ? [{ text: t("Open computer"), onPress: openBotComputer }] : []),
+    ...(!readOnly && botId && !collaborator
+      ? [{ text: t("Open computer"), onPress: openBotComputer }]
+      : []),
     {
       text: t("Profile"),
       onPress: () =>
@@ -1157,42 +1165,46 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
           params: { botId: botId ?? "" },
         }),
     },
-    {
-      text: t("Clear conversation"),
-      destructive: true,
-      onPress: () =>
-        Alert.alert(
-          t("Clear conversation?"),
-          t(
-            "This removes every message and stops current work. The bot, computer, memory, and routines are kept.",
-          ),
-          [
-            { text: t("Cancel"), style: "cancel" },
-            { text: t("Clear"), style: "destructive", onPress: clearConversation },
-          ],
-        ),
-    },
-    {
-      text: t("Archive"),
-      onPress: () =>
-        void rpc("bots/archive", { botId })
-          .then(() => {
-            notifyArchivedChatsChanged();
-            leaveBot();
-          })
-          .catch((error) =>
-            Alert.alert(t("Could not archive bot"), errorText(error, t("Try again."))),
-          ),
-    },
-    {
-      text: t("Delete…"),
-      destructive: true,
-      onPress: () =>
-        confirmDeleteBot({ id: botId ?? "", name: displayName || t("Bot") }, () => {
-          notifyArchivedChatsChanged();
-          leaveBot();
-        }),
-    },
+    ...(!collaborator
+      ? [
+          {
+            text: t("Clear conversation"),
+            destructive: true,
+            onPress: () =>
+              Alert.alert(
+                t("Clear conversation?"),
+                t(
+                  "This removes every message and stops current work. The bot, computer, memory, and routines are kept.",
+                ),
+                [
+                  { text: t("Cancel"), style: "cancel" },
+                  { text: t("Clear"), style: "destructive", onPress: clearConversation },
+                ],
+              ),
+          },
+          {
+            text: t("Archive"),
+            onPress: () =>
+              void rpc("bots/archive", { botId })
+                .then(() => {
+                  notifyArchivedChatsChanged();
+                  leaveBot();
+                })
+                .catch((error) =>
+                  Alert.alert(t("Could not archive bot"), errorText(error, t("Try again."))),
+                ),
+          },
+          {
+            text: t("Delete…"),
+            destructive: true,
+            onPress: () =>
+              confirmDeleteBot({ id: botId ?? "", name: displayName || t("Bot") }, () => {
+                notifyArchivedChatsChanged();
+                leaveBot();
+              }),
+          },
+        ]
+      : []),
   ];
 
   function showBotActions() {
@@ -1977,8 +1989,11 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
   );
 
   const openComputer = useCallback(
-    (id: string, botName: string) =>
-      router.push({ pathname: "/computer", params: { botId: id, name: botName } }),
+    (id: string, botName: string) => {
+      if (mentionBotsRef.current.find((bot) => bot.id === id)?.accessRole === "collaborator")
+        return;
+      router.push({ pathname: "/computer", params: { botId: id, name: botName } });
+    },
     [router],
   );
 
@@ -2169,8 +2184,15 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
     },
   );
 
-  const answerableAskIds = useMemo(() => answerableAskMessageIds(snap), [snap]);
-  const dismissableAskIds = useMemo(() => dismissableAskMessageIds(snap, userId), [snap, userId]);
+  const canApprove = !collaborator || currentBot?.canApprove === true;
+  const answerableAskIds = useMemo(
+    () => (canApprove ? answerableAskMessageIds(snap) : new Set<string>()),
+    [snap, canApprove],
+  );
+  const dismissableAskIds = useMemo(
+    () => (canApprove ? dismissableAskMessageIds(snap, userId) : new Set<string>()),
+    [snap, userId, canApprove],
+  );
   const runError = snap?.run?.status === "failed" ? (snap.run.error ?? null) : null;
   const normalizedRunError = useRunError(runError, false);
   const failedRunId = runError ? snap?.run?.id : null;
@@ -2481,7 +2503,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
       const replyBotId = message.replyPreview?.botId ?? parent?.botId;
       const replyAuthor =
         (message.replyPreview?.role ?? parent?.role) === "user"
-          ? t("You")
+          ? (parent?.authorName ?? "")
           : (memberName(snap?.members, replyBotId) ??
             mentionBots.find((bot) => bot.id === replyBotId)?.name ??
             displayName ??
@@ -2681,7 +2703,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
     <FailedSendBubble
       key={attempt.clientNonce}
       attempt={attempt}
-      needsModel={needsModel}
+      needsModel={collaborator ? false : needsModel}
       onRetry={() => {
         followOwnSend();
         void deliver(attempt, true);
@@ -2699,9 +2721,15 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
       summary={visibleRunError?.summary ?? null}
       resetAt={visibleRunError?.resetAt}
       onDetails={() => setRunErrorDetailsOpen(true)}
-      onConnection={visibleRunError?.recovery === "connection" ? openErrorConnection : undefined}
+      onConnection={
+        !collaborator && visibleRunError?.recovery === "connection"
+          ? openErrorConnection
+          : undefined
+      }
       onModel={
-        visibleRunError?.recovery && (snap?.run?.botId ?? botId) ? openErrorModel : undefined
+        !collaborator && visibleRunError?.recovery && (snap?.run?.botId ?? botId)
+          ? openErrorModel
+          : undefined
       }
     />
   );
@@ -2992,7 +3020,7 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
               <ComposerReplyPreview
                 author={
                   replyTarget.role === "user"
-                    ? t("You")
+                    ? (replyTarget.authorName ?? "")
                     : (memberName(snap?.members, replyTarget.botId) ?? displayName ?? t("Bot"))
                 }
                 quote={replyQuote}
@@ -3083,9 +3111,9 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
             replyTargetId={replyTarget?.id}
             replyQuote={replyQuote}
             attachmentIds={activePendingAttachments.map((attachment) => attachment.id)}
-            botId={botId}
+            botId={collaborator ? undefined : botId}
             onCall={onCall}
-            working={working}
+            working={composerWorking}
             sending={sending}
             styles={styles}
             attachActions={attachActions}
@@ -3150,8 +3178,8 @@ function Thread({ sessionEpoch, userId }: { sessionEpoch: number; userId: string
         <RunErrorSheet
           details={runErrorDetailsOpen ? runError : null}
           onClose={() => setRunErrorDetailsOpen(false)}
-          onConnection={openErrorConnection}
-          onModel={(snap?.run?.botId ?? botId) ? openErrorModel : undefined}
+          onConnection={collaborator ? undefined : openErrorConnection}
+          onModel={!collaborator && (snap?.run?.botId ?? botId) ? openErrorModel : undefined}
         />
         {markdownPreview && artifactTarget ? (
           <MarkdownArtifactPreview
@@ -3950,20 +3978,26 @@ const MessageBubbleContent = memo(function MessageBubbleContent({
   const [peerExpanded, setPeerExpanded] = useState(false);
   const artifactTarget: MobileArtifactTarget = groupId ? { groupId } : { botId };
   const cardBotId = message.botId ?? botId;
-  const computerBotId = message.botId ?? (groupId ? undefined : botId);
+  const canManageBot = bots.find((bot) => bot.id === cardBotId)?.accessRole !== "collaborator";
+  const computerTarget = message.botId ?? (groupId ? undefined : botId);
+  const computerBotId =
+    bots.find((bot) => bot.id === computerTarget)?.accessRole === "collaborator"
+      ? undefined
+      : computerTarget;
   const appConnectBlocks = message.blocks.filter(
     (block): block is Extract<MessageBlock, { kind: "app_connect" }> =>
-      block.kind === "app_connect",
+      block.kind === "app_connect" && canManageBot,
   );
   const mcpApprovalBlocks = message.blocks.filter(
     (block): block is Extract<MessageBlock, { kind: "mcp_approval" }> =>
-      block.kind === "mcp_approval",
+      block.kind === "mcp_approval" && canManageBot,
   );
   const undoBlock = message.blocks.find(
     (block): block is Extract<MessageBlock, { kind: "ask" }> =>
       block.kind === "ask" && Boolean(block.instructionUpdate?.undoVersionId),
   );
   if (undoBlock?.instructionUpdate?.undoVersionId) {
+    if (!canManageBot) return null;
     return (
       <InstructionUndo
         botId={undoBlock.instructionUpdate.botId}
@@ -3977,6 +4011,7 @@ const MessageBubbleContent = memo(function MessageBubbleContent({
       block.kind === "ask" && !isApprovalAskBlock(block) && !block.actions?.length,
   );
   if (ask) {
+    if (!canManageBot && ask.instructionUpdate) return null;
     return (
       <View style={{ gap: 8, width: "100%" }}>
         <AskBlock
@@ -4147,6 +4182,7 @@ const MessageBubbleContent = memo(function MessageBubbleContent({
     (block) => block.kind === "ask" && Boolean(block.actions?.length),
   );
   if (askBlock?.kind === "ask" && askBlock.actions?.length) {
+    if (!canManageBot && askBlock.instructionUpdate) return null;
     return (
       <View style={{ gap: 8, width: "100%" }}>
         <View
@@ -4268,7 +4304,11 @@ const MessageBubbleContent = memo(function MessageBubbleContent({
     .join("\n");
   if (attachments.length > 0) {
     const speaker =
-      message.role === "bot" ? (memberName(members, message.botId) ?? botName) : undefined;
+      message.role === "user"
+        ? message.authorName
+        : message.role === "bot"
+          ? (memberName(members, message.botId) ?? botName)
+          : undefined;
     const speakerColor =
       message.role === "bot" ? speakerColorFor(bots, members, message.botId) : undefined;
     return (
@@ -4282,8 +4322,16 @@ const MessageBubbleContent = memo(function MessageBubbleContent({
           gap: 8,
         }}
       >
-        {showBotSenderName && speaker ? (
-          <Text style={{ color: speakerColor ?? tokens.mutedForeground, ...typeScale.footnote }}>
+        {(showBotSenderName || message.role === "user") && speaker ? (
+          <Text
+            style={{
+              color:
+                message.role === "user"
+                  ? tokens.chatUserForeground
+                  : (speakerColor ?? tokens.mutedForeground),
+              ...typeScale.footnote,
+            }}
+          >
             {speaker}
           </Text>
         ) : null}
@@ -4424,12 +4472,17 @@ const MessageBubbleContent = memo(function MessageBubbleContent({
   }
   const segments = messagePresentationSegments(message.blocks);
   const speaker =
-    message.role === "bot" ? (memberName(members, message.botId) ?? botName) : undefined;
+    message.role === "user"
+      ? message.authorName
+      : message.role === "bot"
+        ? (memberName(members, message.botId) ?? botName)
+        : undefined;
   const speakerColor =
     message.role === "bot" ? speakerColorFor(bots, members, message.botId) : undefined;
   const firstContent = segments.findIndex((segment) => segment.kind === "content");
   const choiceBlocks = message.blocks.filter(
-    (block): block is Extract<MessageBlock, { kind: "choice" }> => block.kind === "choice",
+    (block): block is Extract<MessageBlock, { kind: "choice" }> =>
+      block.kind === "choice" && canManageBot,
   );
   const computerBlocks = message.blocks.filter(
     (block): block is Extract<MessageBlock, { kind: "computer" }> => block.kind === "computer",
@@ -4440,7 +4493,11 @@ const MessageBubbleContent = memo(function MessageBubbleContent({
         <MessageTextCard
           key={`${message.id}-content-${index}`}
           message={{ ...message, blocks: segment.blocks }}
-          speaker={showBotSenderName && index === firstContent ? speaker : undefined}
+          speaker={
+            (showBotSenderName || message.role === "user") && index === firstContent
+              ? speaker
+              : undefined
+          }
           speakerColor={showBotSenderName && index === firstContent ? speakerColor : undefined}
           actionProps={actionProps}
           doubleTapSurface={doubleTapSurface}
@@ -4749,7 +4806,10 @@ function MessageTextCard({
       {speaker ? (
         <Text
           style={{
-            color: speakerColor ?? tokens.mutedForeground,
+            color:
+              message.role === "user"
+                ? tokens.chatUserForeground
+                : (speakerColor ?? tokens.mutedForeground),
             ...typeScale.footnote,
             marginBottom: 4,
           }}

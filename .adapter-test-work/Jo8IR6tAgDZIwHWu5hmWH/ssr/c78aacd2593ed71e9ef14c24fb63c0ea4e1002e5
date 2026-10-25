@@ -1,0 +1,44 @@
+__vite_ssr_exportName__("withNewestThreadMessages", () => { try { return withNewestThreadMessages } catch {} });
+const __vite_ssr_import_0__ = await __vite_ssr_import__("/packages/db/src/client.ts", {"importedNames":["Prisma"]});
+const __vite_ssr_import_1__ = await __vite_ssr_import__("/packages/db/src/content-encryption.ts", {"importedNames":["contentEncryptionOf"]});
+
+
+/**
+* One indexed read of the newest `limit` messages per thread. A nested `take`
+* on `findMany` is applied in memory and would load every message.
+*/
+async function withNewestThreadMessages(prisma, parents, limit) {
+	const threadIds = parents.flatMap((parent) => parent.thread ? [parent.thread.id] : []);
+	const loaded = threadIds.length === 0 ? [] : await prisma.$queryRaw(__vite_ssr_import_0__.Prisma.sql`
+          SELECT m.id, m."threadId", m.seq, m.role, m.blocks, m."botId",
+            m."replyToMessageId", m."replyQuote", m."runId", m."clientNonce", m."createdAt"
+          FROM unnest(${threadIds}::text[]) AS t(id)
+          CROSS JOIN LATERAL (
+            SELECT id, "threadId", seq, role, blocks, "botId", "replyToMessageId", "replyQuote",
+              "runId", "clientNonce", "createdAt"
+            FROM messages
+            WHERE "threadId" = t.id
+            ORDER BY seq DESC
+            LIMIT ${limit}
+          ) m
+          ORDER BY m."threadId", m.seq DESC
+        `);
+	const opened = await (0,__vite_ssr_import_1__.contentEncryptionOf)(prisma)?.openRows("Message", loaded) ?? loaded;
+	const byThread = new Map();
+	for (const row of opened) {
+		const list = byThread.get(row.threadId);
+		if (list) list.push(row);
+		else byThread.set(row.threadId, [row]);
+	};
+	return parents.map((parent) => ({
+		...parent,
+		thread: parent.thread ? {
+			...parent.thread,
+			messages: byThread.get(parent.thread.id) ?? []
+		} : null
+	}));
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTtBQUNBO0FBQ0E7Ozs7Ozs7QUFxQk8sZUFBZSx5QkFDcEIsUUFDQSxTQUNBLE9BQ0E7Q0FDQSxNQUFNLFlBQVksUUFBUSxTQUFTLFdBQVksT0FBTyxTQUFTLENBQUMsT0FBTyxPQUFPLEVBQUUsSUFBSSxDQUFDLENBQUU7Q0FDdkYsTUFBTSxTQUNKLFVBQVUsV0FBVyxJQUNqQixDQUFDLElBQ0QsTUFBTSxPQUFPLFVBQW1DLDZCQUFPLEdBQUc7Ozt3QkFHMUMsVUFBVTs7Ozs7OztvQkFPZDs7O1NBR1g7Q0FDUCxNQUFNLFNBQVUsTUFBTSw4Q0FBb0IsTUFBTSxDQUFDLEVBQUUsU0FBUyxXQUFXLE1BQU0sS0FBTTtDQUNuRixNQUFNLFdBQVcsSUFBSSxJQUFxQztDQUMxRCxLQUFLLE1BQU0sT0FBTyxRQUFRO0VBQ3hCLE1BQU0sT0FBTyxTQUFTLElBQUksSUFBSSxRQUFRO0VBQ3RDLElBQUksTUFBTSxLQUFLLEtBQUssR0FBRztPQUNsQixTQUFTLElBQUksSUFBSSxVQUFVLENBQUMsR0FBRyxDQUFDO0NBQ3ZDO0NBQ0EsT0FBTyxRQUFRLEtBQUssWUFBWTtFQUM5QixHQUFHO0VBQ0gsUUFBUSxPQUFPLFNBQ1g7R0FBRSxHQUFHLE9BQU87R0FBUSxVQUFVLFNBQVMsSUFBSSxPQUFPLE9BQU8sRUFBRSxLQUFLLENBQUM7RUFBRSxJQUNuRTtDQUNOLEVBQUU7QUFDSiIsIm5hbWVzIjpbXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZXMiOlsicHJldmlldy1tZXNzYWdlcy50cyJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgdHlwZSB7IFByaXNtYUNsaWVudCB9IGZyb20gXCIuL2NsaWVudC5qc1wiO1xuaW1wb3J0IHsgUHJpc21hIH0gZnJvbSBcIi4vY2xpZW50LmpzXCI7XG5pbXBvcnQgeyBjb250ZW50RW5jcnlwdGlvbk9mIH0gZnJvbSBcIi4vY29udGVudC1lbmNyeXB0aW9uLmpzXCI7XG5cbi8qKiBTY2FsYXIgY29sdW1ucyB0aGUgc2lkZWJhciBwcmV2aWV3IGFuZCBpdHMgb2xkZXItcGFnZSBmYWxsYmFjayBib3RoIHJlYWQuICovXG5leHBvcnQgaW50ZXJmYWNlIFNpZGViYXJQcmV2aWV3TWVzc2FnZSB7XG4gIGlkOiBzdHJpbmc7XG4gIHRocmVhZElkOiBzdHJpbmc7XG4gIHNlcTogbnVtYmVyO1xuICByb2xlOiBzdHJpbmc7XG4gIGJsb2NrczogUHJpc21hLkpzb25WYWx1ZTtcbiAgYm90SWQ6IHN0cmluZyB8IG51bGw7XG4gIHJlcGx5VG9NZXNzYWdlSWQ6IHN0cmluZyB8IG51bGw7XG4gIHJlcGx5UXVvdGU6IHN0cmluZyB8IG51bGw7XG4gIHJ1bklkOiBzdHJpbmcgfCBudWxsO1xuICBjbGllbnROb25jZTogc3RyaW5nIHwgbnVsbDtcbiAgY3JlYXRlZEF0OiBEYXRlO1xufVxuXG4vKipcbiAqIE9uZSBpbmRleGVkIHJlYWQgb2YgdGhlIG5ld2VzdCBgbGltaXRgIG1lc3NhZ2VzIHBlciB0aHJlYWQuIEEgbmVzdGVkIGB0YWtlYFxuICogb24gYGZpbmRNYW55YCBpcyBhcHBsaWVkIGluIG1lbW9yeSBhbmQgd291bGQgbG9hZCBldmVyeSBtZXNzYWdlLlxuICovXG5leHBvcnQgYXN5bmMgZnVuY3Rpb24gd2l0aE5ld2VzdFRocmVhZE1lc3NhZ2VzPFQgZXh0ZW5kcyB7IHRocmVhZDogeyBpZDogc3RyaW5nIH0gfCBudWxsIH0+KFxuICBwcmlzbWE6IFByaXNtYUNsaWVudCxcbiAgcGFyZW50czogVFtdLFxuICBsaW1pdDogbnVtYmVyLFxuKSB7XG4gIGNvbnN0IHRocmVhZElkcyA9IHBhcmVudHMuZmxhdE1hcCgocGFyZW50KSA9PiAocGFyZW50LnRocmVhZCA/IFtwYXJlbnQudGhyZWFkLmlkXSA6IFtdKSk7XG4gIGNvbnN0IGxvYWRlZCA9XG4gICAgdGhyZWFkSWRzLmxlbmd0aCA9PT0gMFxuICAgICAgPyBbXVxuICAgICAgOiBhd2FpdCBwcmlzbWEuJHF1ZXJ5UmF3PFNpZGViYXJQcmV2aWV3TWVzc2FnZVtdPihQcmlzbWEuc3FsYFxuICAgICAgICAgIFNFTEVDVCBtLmlkLCBtLlwidGhyZWFkSWRcIiwgbS5zZXEsIG0ucm9sZSwgbS5ibG9ja3MsIG0uXCJib3RJZFwiLFxuICAgICAgICAgICAgbS5cInJlcGx5VG9NZXNzYWdlSWRcIiwgbS5cInJlcGx5UXVvdGVcIiwgbS5cInJ1bklkXCIsIG0uXCJjbGllbnROb25jZVwiLCBtLlwiY3JlYXRlZEF0XCJcbiAgICAgICAgICBGUk9NIHVubmVzdCgke3RocmVhZElkc306OnRleHRbXSkgQVMgdChpZClcbiAgICAgICAgICBDUk9TUyBKT0lOIExBVEVSQUwgKFxuICAgICAgICAgICAgU0VMRUNUIGlkLCBcInRocmVhZElkXCIsIHNlcSwgcm9sZSwgYmxvY2tzLCBcImJvdElkXCIsIFwicmVwbHlUb01lc3NhZ2VJZFwiLCBcInJlcGx5UXVvdGVcIixcbiAgICAgICAgICAgICAgXCJydW5JZFwiLCBcImNsaWVudE5vbmNlXCIsIFwiY3JlYXRlZEF0XCJcbiAgICAgICAgICAgIEZST00gbWVzc2FnZXNcbiAgICAgICAgICAgIFdIRVJFIFwidGhyZWFkSWRcIiA9IHQuaWRcbiAgICAgICAgICAgIE9SREVSIEJZIHNlcSBERVNDXG4gICAgICAgICAgICBMSU1JVCAke2xpbWl0fVxuICAgICAgICAgICkgbVxuICAgICAgICAgIE9SREVSIEJZIG0uXCJ0aHJlYWRJZFwiLCBtLnNlcSBERVNDXG4gICAgICAgIGApO1xuICBjb25zdCBvcGVuZWQgPSAoYXdhaXQgY29udGVudEVuY3J5cHRpb25PZihwcmlzbWEpPy5vcGVuUm93cyhcIk1lc3NhZ2VcIiwgbG9hZGVkKSkgPz8gbG9hZGVkO1xuICBjb25zdCBieVRocmVhZCA9IG5ldyBNYXA8c3RyaW5nLCBTaWRlYmFyUHJldmlld01lc3NhZ2VbXT4oKTtcbiAgZm9yIChjb25zdCByb3cgb2Ygb3BlbmVkKSB7XG4gICAgY29uc3QgbGlzdCA9IGJ5VGhyZWFkLmdldChyb3cudGhyZWFkSWQpO1xuICAgIGlmIChsaXN0KSBsaXN0LnB1c2gocm93KTtcbiAgICBlbHNlIGJ5VGhyZWFkLnNldChyb3cudGhyZWFkSWQsIFtyb3ddKTtcbiAgfVxuICByZXR1cm4gcGFyZW50cy5tYXAoKHBhcmVudCkgPT4gKHtcbiAgICAuLi5wYXJlbnQsXG4gICAgdGhyZWFkOiBwYXJlbnQudGhyZWFkXG4gICAgICA/IHsgLi4ucGFyZW50LnRocmVhZCwgbWVzc2FnZXM6IGJ5VGhyZWFkLmdldChwYXJlbnQudGhyZWFkLmlkKSA/PyBbXSB9XG4gICAgICA6IG51bGwsXG4gIH0pKTtcbn1cbiJdLCJmaWxlIjoiL3BhY2thZ2VzL2RiL3NyYy9wcmV2aWV3LW1lc3NhZ2VzLnRzIn0=
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvZGIvc3JjL3ByZXZpZXctbWVzc2FnZXMudHMiLCIvcGFja2FnZXMvZGIvc3JjL3ByZXZpZXctbWVzc2FnZXMudHMiLFtdXQ==

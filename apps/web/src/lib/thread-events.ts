@@ -532,6 +532,12 @@ export function reduceThreadSnapshot(
       threadId: event.threadId,
       seq: event.seq,
       role,
+      authorUserId:
+        typeof event.payload.authorUserId === "string"
+          ? event.payload.authorUserId
+          : known?.authorUserId,
+      authorName:
+        typeof event.payload.authorName === "string" ? event.payload.authorName : known?.authorName,
       blocks,
       botId: event.botId,
       runId: event.runId,

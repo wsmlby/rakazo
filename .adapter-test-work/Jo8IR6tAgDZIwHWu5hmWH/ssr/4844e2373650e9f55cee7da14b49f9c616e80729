@@ -1,0 +1,64 @@
+__vite_ssr_exportName__("AUTOMATED_MESSAGE_LABEL", () => { try { return AUTOMATED_MESSAGE_LABEL } catch {} });
+__vite_ssr_exportName__("automated", () => { try { return automated } catch {} });
+__vite_ssr_exportName__("PARTIAL_REPLY_NOTE", () => { try { return PARTIAL_REPLY_NOTE } catch {} });
+__vite_ssr_exportName__("TOOL_IMAGES_TEXT", () => { try { return TOOL_IMAGES_TEXT } catch {} });
+__vite_ssr_exportName__("TOOL_IMAGES_LABEL", () => { try { return TOOL_IMAGES_LABEL } catch {} });
+__vite_ssr_exportName__("relabelToolImageMessages", () => { try { return relabelToolImageMessages } catch {} });
+__vite_ssr_exportName__("withAutomatedLabels", () => { try { return withAutomatedLabels } catch {} });
+/**
+* Messages that Rakazo, or its model library, adds to a conversation in the user's role
+* are not from the user: screenshots moved out of tool results, nudges to continue,
+* finished background shell output, a helper's task. Models (local ones especially)
+* took them for the user replying, kept going instead of asking, and confused their
+* helpers with the user. Label them plainly.
+*/
+const AUTOMATED_MESSAGE_LABEL = "[Automated message from Rakazo, not from the user]";
+function automated(text) {
+	return `${AUTOMATED_MESSAGE_LABEL} ${text}`;
+};
+/** Follows a kept reply in later history, so the model knows that reply is incomplete. */
+const PARTIAL_REPLY_NOTE = automated("This reply was cut off by an error before it was finished.");
+/** What pi-ai writes before screenshots it moves out of a tool result into a user message. */
+const TOOL_IMAGES_TEXT = "Attached image(s) from tool result:";
+const TOOL_IMAGES_LABEL = automated("Screenshot(s) returned by your last tool call. The user has not replied.");
+/**
+* Relabel those screenshot messages in an OpenAI-style request payload. Returns a new
+* payload when something changed, otherwise undefined (pi-ai then keeps its own).
+*/
+function relabelToolImageMessages(payload) {
+	const messages = payload?.messages;
+	if (!Array.isArray(messages)) return undefined;
+	let changed = false;
+	const next = messages.map((message) => {
+		if (message?.role !== "user" || !Array.isArray(message.content)) return message;
+		const [first, ...rest] = message.content;
+		if (first?.type !== "text" || first.text !== TOOL_IMAGES_TEXT) return message;
+		changed = true;
+		return {
+			...message,
+			content: [{
+				...first,
+				text: TOOL_IMAGES_LABEL
+			}, ...rest]
+		};
+	});
+	return changed ? {
+		...payload,
+		messages: next
+	} : undefined;
+};
+/** Stream options with the relabel step added after any onPayload hook already there. */
+function withAutomatedLabels(options) {
+	const previous = options?.onPayload;
+	return {
+		...options ?? {},
+		onPayload: async (payload, model) => {
+			const replaced = previous ? await previous(payload, model) : undefined;
+			return relabelToolImageMessages(replaced ?? payload) ?? replaced;
+		}
+	};
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7Ozs7Ozs7Ozs7Ozs7QUFPTyxNQUFNLDBCQUEwQjtBQUVoQyxTQUFTLFVBQVUsTUFBc0I7Q0FDOUMsT0FBTyxHQUFHLHdCQUF3QixHQUFHO0FBQ3ZDOztBQUdPLE1BQU0scUJBQXFCLFVBQ2hDLDREQUNGOztBQUdPLE1BQU0sbUJBQW1CO0FBQ3pCLE1BQU0sb0JBQW9CLFVBQy9CLDBFQUNGOzs7OztBQVFPLFNBQVMseUJBQXlCLFNBQTJCO0NBQ2xFLE1BQU0sV0FBWSxTQUF1RDtDQUN6RSxJQUFJLENBQUMsTUFBTSxRQUFRLFFBQVEsR0FBRyxPQUFPO0NBQ3JDLElBQUksVUFBVTtDQUNkLE1BQU0sT0FBTyxTQUFTLEtBQUssWUFBbUQ7RUFDNUUsSUFBSSxTQUFTLFNBQVMsVUFBVSxDQUFDLE1BQU0sUUFBUSxRQUFRLE9BQU8sR0FBRyxPQUFPO0VBQ3hFLE1BQU0sQ0FBQyxPQUFPLEdBQUcsUUFBUSxRQUFRO0VBQ2pDLElBQUksT0FBTyxTQUFTLFVBQVUsTUFBTSxTQUFTLGtCQUFrQixPQUFPO0VBQ3RFLFVBQVU7RUFDVixPQUFPO0dBQUUsR0FBRztHQUFTLFNBQVMsQ0FBQztJQUFFLEdBQUc7SUFBTyxNQUFNO0dBQWtCLEdBQUcsR0FBRyxJQUFJO0VBQUU7Q0FDakYsQ0FBQztDQUNELE9BQU8sVUFBVTtFQUFFLEdBQUk7RUFBb0IsVUFBVTtDQUFLLElBQUk7QUFDaEU7O0FBS08sU0FBUyxvQkFBc0MsU0FBMkI7Q0FDL0UsTUFBTSxXQUFZLFNBQXFEO0NBQ3ZFLE9BQU87RUFDTCxHQUFJLFdBQVcsQ0FBQztFQUNoQixXQUFXLE9BQU8sU0FBa0IsVUFBaUI7R0FDbkQsTUFBTSxXQUFXLFdBQVcsTUFBTSxTQUFTLFNBQVMsS0FBSyxJQUFJO0dBQzdELE9BQU8seUJBQXlCLFlBQVksT0FBTyxLQUFLO0VBQzFEO0NBQ0Y7QUFDRiIsIm5hbWVzIjpbXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZXMiOlsiYXV0b21hdGVkLW1lc3NhZ2VzLnRzIl0sInNvdXJjZXNDb250ZW50IjpbIi8qKlxuICogTWVzc2FnZXMgdGhhdCBSYWthem8sIG9yIGl0cyBtb2RlbCBsaWJyYXJ5LCBhZGRzIHRvIGEgY29udmVyc2F0aW9uIGluIHRoZSB1c2VyJ3Mgcm9sZVxuICogYXJlIG5vdCBmcm9tIHRoZSB1c2VyOiBzY3JlZW5zaG90cyBtb3ZlZCBvdXQgb2YgdG9vbCByZXN1bHRzLCBudWRnZXMgdG8gY29udGludWUsXG4gKiBmaW5pc2hlZCBiYWNrZ3JvdW5kIHNoZWxsIG91dHB1dCwgYSBoZWxwZXIncyB0YXNrLiBNb2RlbHMgKGxvY2FsIG9uZXMgZXNwZWNpYWxseSlcbiAqIHRvb2sgdGhlbSBmb3IgdGhlIHVzZXIgcmVwbHlpbmcsIGtlcHQgZ29pbmcgaW5zdGVhZCBvZiBhc2tpbmcsIGFuZCBjb25mdXNlZCB0aGVpclxuICogaGVscGVycyB3aXRoIHRoZSB1c2VyLiBMYWJlbCB0aGVtIHBsYWlubHkuXG4gKi9cbmV4cG9ydCBjb25zdCBBVVRPTUFURURfTUVTU0FHRV9MQUJFTCA9IFwiW0F1dG9tYXRlZCBtZXNzYWdlIGZyb20gUmFrYXpvLCBub3QgZnJvbSB0aGUgdXNlcl1cIjtcblxuZXhwb3J0IGZ1bmN0aW9uIGF1dG9tYXRlZCh0ZXh0OiBzdHJpbmcpOiBzdHJpbmcge1xuICByZXR1cm4gYCR7QVVUT01BVEVEX01FU1NBR0VfTEFCRUx9ICR7dGV4dH1gO1xufVxuXG4vKiogRm9sbG93cyBhIGtlcHQgcmVwbHkgaW4gbGF0ZXIgaGlzdG9yeSwgc28gdGhlIG1vZGVsIGtub3dzIHRoYXQgcmVwbHkgaXMgaW5jb21wbGV0ZS4gKi9cbmV4cG9ydCBjb25zdCBQQVJUSUFMX1JFUExZX05PVEUgPSBhdXRvbWF0ZWQoXG4gIFwiVGhpcyByZXBseSB3YXMgY3V0IG9mZiBieSBhbiBlcnJvciBiZWZvcmUgaXQgd2FzIGZpbmlzaGVkLlwiLFxuKTtcblxuLyoqIFdoYXQgcGktYWkgd3JpdGVzIGJlZm9yZSBzY3JlZW5zaG90cyBpdCBtb3ZlcyBvdXQgb2YgYSB0b29sIHJlc3VsdCBpbnRvIGEgdXNlciBtZXNzYWdlLiAqL1xuZXhwb3J0IGNvbnN0IFRPT0xfSU1BR0VTX1RFWFQgPSBcIkF0dGFjaGVkIGltYWdlKHMpIGZyb20gdG9vbCByZXN1bHQ6XCI7XG5leHBvcnQgY29uc3QgVE9PTF9JTUFHRVNfTEFCRUwgPSBhdXRvbWF0ZWQoXG4gIFwiU2NyZWVuc2hvdChzKSByZXR1cm5lZCBieSB5b3VyIGxhc3QgdG9vbCBjYWxsLiBUaGUgdXNlciBoYXMgbm90IHJlcGxpZWQuXCIsXG4pO1xuXG50eXBlIFBhcnQgPSB7IHR5cGU/OiB1bmtub3duOyB0ZXh0PzogdW5rbm93biB9O1xuXG4vKipcbiAqIFJlbGFiZWwgdGhvc2Ugc2NyZWVuc2hvdCBtZXNzYWdlcyBpbiBhbiBPcGVuQUktc3R5bGUgcmVxdWVzdCBwYXlsb2FkLiBSZXR1cm5zIGEgbmV3XG4gKiBwYXlsb2FkIHdoZW4gc29tZXRoaW5nIGNoYW5nZWQsIG90aGVyd2lzZSB1bmRlZmluZWQgKHBpLWFpIHRoZW4ga2VlcHMgaXRzIG93bikuXG4gKi9cbmV4cG9ydCBmdW5jdGlvbiByZWxhYmVsVG9vbEltYWdlTWVzc2FnZXMocGF5bG9hZDogdW5rbm93bik6IHVua25vd24ge1xuICBjb25zdCBtZXNzYWdlcyA9IChwYXlsb2FkIGFzIHsgbWVzc2FnZXM/OiB1bmtub3duIH0gfCBudWxsIHwgdW5kZWZpbmVkKT8ubWVzc2FnZXM7XG4gIGlmICghQXJyYXkuaXNBcnJheShtZXNzYWdlcykpIHJldHVybiB1bmRlZmluZWQ7XG4gIGxldCBjaGFuZ2VkID0gZmFsc2U7XG4gIGNvbnN0IG5leHQgPSBtZXNzYWdlcy5tYXAoKG1lc3NhZ2U6IHsgcm9sZT86IHVua25vd247IGNvbnRlbnQ/OiB1bmtub3duIH0pID0+IHtcbiAgICBpZiAobWVzc2FnZT8ucm9sZSAhPT0gXCJ1c2VyXCIgfHwgIUFycmF5LmlzQXJyYXkobWVzc2FnZS5jb250ZW50KSkgcmV0dXJuIG1lc3NhZ2U7XG4gICAgY29uc3QgW2ZpcnN0LCAuLi5yZXN0XSA9IG1lc3NhZ2UuY29udGVudCBhcyBQYXJ0W107XG4gICAgaWYgKGZpcnN0Py50eXBlICE9PSBcInRleHRcIiB8fCBmaXJzdC50ZXh0ICE9PSBUT09MX0lNQUdFU19URVhUKSByZXR1cm4gbWVzc2FnZTtcbiAgICBjaGFuZ2VkID0gdHJ1ZTtcbiAgICByZXR1cm4geyAuLi5tZXNzYWdlLCBjb250ZW50OiBbeyAuLi5maXJzdCwgdGV4dDogVE9PTF9JTUFHRVNfTEFCRUwgfSwgLi4ucmVzdF0gfTtcbiAgfSk7XG4gIHJldHVybiBjaGFuZ2VkID8geyAuLi4ocGF5bG9hZCBhcyBvYmplY3QpLCBtZXNzYWdlczogbmV4dCB9IDogdW5kZWZpbmVkO1xufVxuXG50eXBlIFBheWxvYWRIb29rID0gKHBheWxvYWQ6IHVua25vd24sIG1vZGVsOiBuZXZlcikgPT4gdW5rbm93bjtcblxuLyoqIFN0cmVhbSBvcHRpb25zIHdpdGggdGhlIHJlbGFiZWwgc3RlcCBhZGRlZCBhZnRlciBhbnkgb25QYXlsb2FkIGhvb2sgYWxyZWFkeSB0aGVyZS4gKi9cbmV4cG9ydCBmdW5jdGlvbiB3aXRoQXV0b21hdGVkTGFiZWxzPE8gZXh0ZW5kcyBvYmplY3Q+KG9wdGlvbnM6IE8gfCB1bmRlZmluZWQpOiBPIHtcbiAgY29uc3QgcHJldmlvdXMgPSAob3B0aW9ucyBhcyB7IG9uUGF5bG9hZD86IFBheWxvYWRIb29rIH0gfCB1bmRlZmluZWQpPy5vblBheWxvYWQ7XG4gIHJldHVybiB7XG4gICAgLi4uKG9wdGlvbnMgPz8ge30pLFxuICAgIG9uUGF5bG9hZDogYXN5bmMgKHBheWxvYWQ6IHVua25vd24sIG1vZGVsOiBuZXZlcikgPT4ge1xuICAgICAgY29uc3QgcmVwbGFjZWQgPSBwcmV2aW91cyA/IGF3YWl0IHByZXZpb3VzKHBheWxvYWQsIG1vZGVsKSA6IHVuZGVmaW5lZDtcbiAgICAgIHJldHVybiByZWxhYmVsVG9vbEltYWdlTWVzc2FnZXMocmVwbGFjZWQgPz8gcGF5bG9hZCkgPz8gcmVwbGFjZWQ7XG4gICAgfSxcbiAgfSBhcyBPO1xufVxuIl0sImZpbGUiOiIvcGFja2FnZXMvYWRhcHRlcnMvc3JjL2F1dG9tYXRlZC1tZXNzYWdlcy50cyJ9
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvYWRhcHRlcnMvc3JjL2F1dG9tYXRlZC1tZXNzYWdlcy50cyIsIi9wYWNrYWdlcy9hZGFwdGVycy9zcmMvYXV0b21hdGVkLW1lc3NhZ2VzLnRzIixbXV0=

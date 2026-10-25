@@ -136,6 +136,70 @@ function mcpFetch(
 }
 
 describe("MCP connector session cache", () => {
+  it("rechecks explicit bot grants and blocks revocation or another bot", async () => {
+    let assigned = true;
+    const prisma = {
+      botMcpServer: {
+        findMany: vi.fn(async () => (assigned ? [ASSIGNMENT] : [])),
+        findFirst: vi.fn(
+          async ({ where }: { where: { botId: string; userId: string; spaceId: string } }) =>
+            assigned &&
+            where.botId === ASSIGNMENT.botId &&
+            where.userId === ASSIGNMENT.userId &&
+            where.spaceId === ASSIGNMENT.spaceId
+              ? ASSIGNMENT
+              : null,
+        ),
+      },
+    };
+    const context = {
+      operationId: "shared-run",
+      traceId: "shared-run",
+      userId: "u1",
+      spaceId: "w1",
+      botId: "bot-1",
+      signal: new AbortController().signal,
+    };
+    const state = { failNext: false, initializations: 0, calls: [] as string[] };
+    vi.stubGlobal("fetch", mcpFetch(state));
+    const connector = new McpConnector(prisma as never, {} as never, { network: TEST_NETWORK });
+    try {
+      const [tool] = await connector.discoverTools(context);
+      expect(tool).toBeDefined();
+      expect(prisma.botMcpServer.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ botId: "bot-1", userId: "u1", spaceId: "w1" }),
+        }),
+      );
+      const call = { tool: tool!.name, route: tool!.route, args: {}, executionId: "call-1" };
+      const results = [];
+      for await (const event of connector.execute(call, context)) results.push(event);
+      expect(results).toEqual([expect.objectContaining({ type: "result" })]);
+      const otherBotResults = [];
+      for await (const event of connector.execute(call, { ...context, botId: "bot-2" }))
+        otherBotResults.push(event);
+      expect(otherBotResults).toEqual([expect.objectContaining({ type: "error" })]);
+      assigned = false;
+      const revokedResults = [];
+      for await (const event of connector.execute(call, context)) revokedResults.push(event);
+      expect(revokedResults).toEqual([expect.objectContaining({ type: "error" })]);
+      expect(state.calls).toEqual(["echo"]);
+      const sharedContext = { ...context, collaborationRestricted: true };
+      assigned = true;
+      prisma.botMcpServer.findMany.mockClear();
+      prisma.botMcpServer.findFirst.mockClear();
+      await expect(connector.discoverTools(sharedContext)).resolves.toEqual([]);
+      const sharedResults = [];
+      for await (const event of connector.execute(call, sharedContext)) sharedResults.push(event);
+      expect(sharedResults).toEqual([expect.objectContaining({ type: "error" })]);
+      expect(prisma.botMcpServer.findMany).not.toHaveBeenCalled();
+      expect(prisma.botMcpServer.findFirst).not.toHaveBeenCalled();
+      expect(state.calls).toEqual(["echo"]);
+    } finally {
+      await connector.close();
+    }
+  });
+
   it("keeps sessions across unchanged TTL reads and reconnects on observed rotation", async () => {
     vi.useFakeTimers();
     const fake = infisicalFake();

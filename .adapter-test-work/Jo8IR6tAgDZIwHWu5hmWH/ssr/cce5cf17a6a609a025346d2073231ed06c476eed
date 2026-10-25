@@ -1,0 +1,33 @@
+__vite_ssr_exportName__("CloudAgentRequestRejected", () => { try { return CloudAgentRequestRejected } catch {} });
+__vite_ssr_exportName__("CloudAgentRetryLater", () => { try { return CloudAgentRetryLater } catch {} });
+/**
+* A provider definitively refused a request. `not_found` means the agent or run no
+* longer exists; `expired` means the agent can no longer accept runs.
+*/
+class CloudAgentRequestRejected extends Error {
+	reason;
+	constructor(reason = "invalid") {
+		super("Cloud agent request was rejected. Check the provider configuration and request.");
+		this.reason = reason;
+		this.name = "CloudAgentRequestRejected";
+	}
+};
+/**
+* The provider refused the credential, rate limited the request, or failed before
+* a mutation was sent. None says anything about the agent itself and nothing was
+* accepted, so callers retry instead of failing it.
+*/
+class CloudAgentRetryLater extends Error {
+	reason;
+	retryAfterMs;
+	constructor(reason, retryAfterMs) {
+		super(reason === "credential" ? "Cloud agent credential was rejected." : reason === "rate_limited" ? "Cloud agent requests are rate limited." : "Cloud agent provider is unavailable.");
+		this.reason = reason;
+		this.retryAfterMs = retryAfterMs;
+		this.name = "CloudAgentRetryLater";
+	}
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7Ozs7O0FBSU8sTUFBTSxrQ0FBa0MsTUFBTTtDQUM5QjtDQUFyQixZQUFZLE1BQVMsR0FBOEMsV0FBVztFQUM1RSxNQUFNLGlGQUFpRjtFQURwRTtFQUVuQixLQUFLLE9BQU87Q0FDZDtBQUNGOzs7Ozs7QUFPTyxNQUFNLDZCQUE2QixNQUFNO0NBRW5DO0NBQ0E7Q0FGWCxZQUNFLE1BQVMsRUFDVCxZQUFTLEVBQ1Q7RUFDQSxNQUNFLFdBQVcsZUFDUCx5Q0FDQSxXQUFXLGlCQUNULDJDQUNBLHNDQUNSO0VBVFM7RUFDQTtFQVNULEtBQUssT0FBTztDQUNkO0FBQ0YiLCJuYW1lcyI6W10sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbImNsb3VkLWFnZW50cy50cyJdLCJzb3VyY2VzQ29udGVudCI6WyIvKipcbiAqIEEgcHJvdmlkZXIgZGVmaW5pdGl2ZWx5IHJlZnVzZWQgYSByZXF1ZXN0LiBgbm90X2ZvdW5kYCBtZWFucyB0aGUgYWdlbnQgb3IgcnVuIG5vXG4gKiBsb25nZXIgZXhpc3RzOyBgZXhwaXJlZGAgbWVhbnMgdGhlIGFnZW50IGNhbiBubyBsb25nZXIgYWNjZXB0IHJ1bnMuXG4gKi9cbmV4cG9ydCBjbGFzcyBDbG91ZEFnZW50UmVxdWVzdFJlamVjdGVkIGV4dGVuZHMgRXJyb3Ige1xuICBjb25zdHJ1Y3RvcihyZWFkb25seSByZWFzb246IFwiaW52YWxpZFwiIHwgXCJub3RfZm91bmRcIiB8IFwiZXhwaXJlZFwiID0gXCJpbnZhbGlkXCIpIHtcbiAgICBzdXBlcihcIkNsb3VkIGFnZW50IHJlcXVlc3Qgd2FzIHJlamVjdGVkLiBDaGVjayB0aGUgcHJvdmlkZXIgY29uZmlndXJhdGlvbiBhbmQgcmVxdWVzdC5cIik7XG4gICAgdGhpcy5uYW1lID0gXCJDbG91ZEFnZW50UmVxdWVzdFJlamVjdGVkXCI7XG4gIH1cbn1cblxuLyoqXG4gKiBUaGUgcHJvdmlkZXIgcmVmdXNlZCB0aGUgY3JlZGVudGlhbCwgcmF0ZSBsaW1pdGVkIHRoZSByZXF1ZXN0LCBvciBmYWlsZWQgYmVmb3JlXG4gKiBhIG11dGF0aW9uIHdhcyBzZW50LiBOb25lIHNheXMgYW55dGhpbmcgYWJvdXQgdGhlIGFnZW50IGl0c2VsZiBhbmQgbm90aGluZyB3YXNcbiAqIGFjY2VwdGVkLCBzbyBjYWxsZXJzIHJldHJ5IGluc3RlYWQgb2YgZmFpbGluZyBpdC5cbiAqL1xuZXhwb3J0IGNsYXNzIENsb3VkQWdlbnRSZXRyeUxhdGVyIGV4dGVuZHMgRXJyb3Ige1xuICBjb25zdHJ1Y3RvcihcbiAgICByZWFkb25seSByZWFzb246IFwiY3JlZGVudGlhbFwiIHwgXCJyYXRlX2xpbWl0ZWRcIiB8IFwidW5hdmFpbGFibGVcIixcbiAgICByZWFkb25seSByZXRyeUFmdGVyTXM/OiBudW1iZXIsXG4gICkge1xuICAgIHN1cGVyKFxuICAgICAgcmVhc29uID09PSBcImNyZWRlbnRpYWxcIlxuICAgICAgICA/IFwiQ2xvdWQgYWdlbnQgY3JlZGVudGlhbCB3YXMgcmVqZWN0ZWQuXCJcbiAgICAgICAgOiByZWFzb24gPT09IFwicmF0ZV9saW1pdGVkXCJcbiAgICAgICAgICA/IFwiQ2xvdWQgYWdlbnQgcmVxdWVzdHMgYXJlIHJhdGUgbGltaXRlZC5cIlxuICAgICAgICAgIDogXCJDbG91ZCBhZ2VudCBwcm92aWRlciBpcyB1bmF2YWlsYWJsZS5cIixcbiAgICApO1xuICAgIHRoaXMubmFtZSA9IFwiQ2xvdWRBZ2VudFJldHJ5TGF0ZXJcIjtcbiAgfVxufVxuIl0sImZpbGUiOiIvcGFja2FnZXMvYWRhcHRlci1raXQvc3JjL2Nsb3VkLWFnZW50cy50cyJ9
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvYWRhcHRlci1raXQvc3JjL2Nsb3VkLWFnZW50cy50cyIsIi9wYWNrYWdlcy9hZGFwdGVyLWtpdC9zcmMvY2xvdWQtYWdlbnRzLnRzIixbXV0=

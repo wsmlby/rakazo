@@ -1,0 +1,100 @@
+__vite_ssr_exportName__("ROUTINE_WATCH_KINDS", () => { try { return ROUTINE_WATCH_KINDS } catch {} });
+__vite_ssr_exportName__("ROUTINE_WATCH_DEFAULT_MINUTES", () => { try { return ROUTINE_WATCH_DEFAULT_MINUTES } catch {} });
+__vite_ssr_exportName__("ROUTINE_WATCH_MIN_MINUTES", () => { try { return ROUTINE_WATCH_MIN_MINUTES } catch {} });
+__vite_ssr_exportName__("RoutineWatchSchema", () => { try { return RoutineWatchSchema } catch {} });
+__vite_ssr_exportName__("ROUTINE_WATCH_OUTCOMES", () => { try { return ROUTINE_WATCH_OUTCOMES } catch {} });
+__vite_ssr_exportName__("RoutineWatchStateSchema", () => { try { return RoutineWatchStateSchema } catch {} });
+const __vite_ssr_import_0__ = await __vite_ssr_import__("/node_modules/.pnpm/zod@4.6.7/node_modules/zod/index.js");
+
+/**
+* A routine that starts "when something changes". A checker, not a model,
+* takes a fingerprint of the watched thing on an interval; the routine only
+* runs when the fingerprint differs from the last one.
+*
+* - `files`: paths on the bot's computer (relative paths resolve into the
+*   bot's own folder). Names, sizes and modified times are compared.
+* - `command`: a shell command on the bot's computer; its output is the
+*   fingerprint. It runs every interval in the bot's folder, without a model
+*   or per-run approval, equivalent to the bot running the command itself.
+*   A non-zero exit is a failed check.
+* - `tool`: a read-only tool from a connected integration, called with fixed
+*   arguments; its result is the fingerprint.
+*
+* `track` (tool and command) narrows a JSON result to its items: objects that
+* carry the first field are compared by the listed fields only, so a fetch
+* time or a snippet does not count as a change, and the note can say which
+* items are new, updated or gone.
+*/
+const ROUTINE_WATCH_KINDS = [
+	"files",
+	"command",
+	"tool"
+];
+const ROUTINE_WATCH_DEFAULT_MINUTES = 15;
+/** Keep unattended checks from hammering computers or connected services. */
+const ROUTINE_WATCH_MIN_MINUTES = 5;
+const RoutineWatchSchema = __vite_ssr_import_0__.object({
+	kind: __vite_ssr_import_0__.enum(ROUTINE_WATCH_KINDS),
+	paths: __vite_ssr_import_0__.array(__vite_ssr_import_0__.string().trim().min(1).max(500)).min(1).max(20).optional(),
+	command: __vite_ssr_import_0__.string().trim().min(1).max(2e3).optional(),
+	tool: __vite_ssr_import_0__.string().trim().min(1).max(200).optional(),
+	args: __vite_ssr_import_0__.record(__vite_ssr_import_0__.string(), __vite_ssr_import_0__.unknown()).optional(),
+	track: __vite_ssr_import_0__.array(__vite_ssr_import_0__.string().trim().min(1).max(100)).min(1).max(5).optional(),
+	everyMinutes: __vite_ssr_import_0__.number().int().min(ROUTINE_WATCH_MIN_MINUTES).max(1440).default(ROUTINE_WATCH_DEFAULT_MINUTES),
+	/** Post "No changes" in chat on every quiet check, not only in history. */
+	loud: __vite_ssr_import_0__.boolean().default(false)
+}).superRefine((value, ctx) => {
+	if (value.kind === "files" && !value.paths?.length) {
+		ctx.addIssue({
+			code: "custom",
+			message: "Add a file or folder to watch",
+			path: ["paths"]
+		});
+	};
+	if (value.kind === "command" && !value.command) {
+		ctx.addIssue({
+			code: "custom",
+			message: "Add a command to run",
+			path: ["command"]
+		});
+	};
+	if (value.kind === "files" && value.track) {
+		ctx.addIssue({
+			code: "custom",
+			message: "Tracked fields apply to a command or tool",
+			path: ["track"]
+		});
+	};
+	if (value.kind === "tool") {
+		if (!value.tool) {
+			ctx.addIssue({
+				code: "custom",
+				message: "Pick a tool to check",
+				path: ["tool"]
+			});
+		}
+	}
+});
+const ROUTINE_WATCH_OUTCOMES = [
+	"baseline",
+	"unchanged",
+	"changed",
+	"failed"
+];
+/** What the last check saw. Written by the checker, never by clients. */
+const RoutineWatchStateSchema = __vite_ssr_import_0__.object({
+	checkedAt: __vite_ssr_import_0__.string(),
+	outcome: __vite_ssr_import_0__.enum(ROUTINE_WATCH_OUTCOMES),
+	fingerprint: __vite_ssr_import_0__.string().nullable(),
+	/**
+	* files: path -> "size:mtime"; tracked items: identity -> their tracked fields and title.
+	* Kept so a change can be described, not just detected.
+	*/
+	entries: __vite_ssr_import_0__.record(__vite_ssr_import_0__.string(), __vite_ssr_import_0__.string()).optional(),
+	/** What changed, or why the check failed, in a sentence or a short list. */
+	detail: __vite_ssr_import_0__.string().nullable()
+});
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7Ozs7O0FBQUE7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OztBQXFCTyxNQUFNLHNCQUFzQjtDQUFDO0NBQVM7Q0FBVztBQUFNO0FBQ3ZELE1BQU0sZ0NBQWdDOztBQUV0QyxNQUFNLDRCQUE0QjtBQUVsQyxNQUFNLHFCQUFxQixzQkFDL0IsT0FBTztDQUNOLE1BQU0sc0JBQUUsS0FBSyxtQkFBbUI7Q0FDaEMsT0FBTyxzQkFBRSxNQUFNLHNCQUFFLE9BQU8sQ0FBQyxDQUFDLEtBQUssQ0FBQyxDQUFDLElBQUksQ0FBQyxDQUFDLENBQUMsSUFBSSxHQUFHLENBQUMsQ0FBQyxDQUFDLElBQUksQ0FBQyxDQUFDLENBQUMsSUFBSSxFQUFFLENBQUMsQ0FBQyxTQUFTO0NBQzFFLFNBQVMsc0JBQUUsT0FBTyxDQUFDLENBQUMsS0FBSyxDQUFDLENBQUMsSUFBSSxDQUFDLENBQUMsQ0FBQyxJQUFJLEdBQUksQ0FBQyxDQUFDLFNBQVM7Q0FDckQsTUFBTSxzQkFBRSxPQUFPLENBQUMsQ0FBQyxLQUFLLENBQUMsQ0FBQyxJQUFJLENBQUMsQ0FBQyxDQUFDLElBQUksR0FBRyxDQUFDLENBQUMsU0FBUztDQUNqRCxNQUFNLHNCQUFFLE9BQU8sc0JBQUUsT0FBTyxHQUFHLHNCQUFFLFFBQVEsQ0FBQyxDQUFDLENBQUMsU0FBUztDQUNqRCxPQUFPLHNCQUFFLE1BQU0sc0JBQUUsT0FBTyxDQUFDLENBQUMsS0FBSyxDQUFDLENBQUMsSUFBSSxDQUFDLENBQUMsQ0FBQyxJQUFJLEdBQUcsQ0FBQyxDQUFDLENBQUMsSUFBSSxDQUFDLENBQUMsQ0FBQyxJQUFJLENBQUMsQ0FBQyxDQUFDLFNBQVM7Q0FDekUsY0FBYyxzQkFDWCxPQUFPLENBQUMsQ0FDUixJQUFJLENBQUMsQ0FDTCxJQUFJLHlCQUF5QixDQUFDLENBQzlCLElBQUksSUFBSSxDQUFDLENBQ1QsUUFBUSw2QkFBNkI7O0NBRXhDLE1BQU0sc0JBQUUsUUFBUSxDQUFDLENBQUMsUUFBUSxLQUFLO0FBQ2pDLENBQUMsQ0FBQyxDQUNELGFBQWEsT0FBTyxRQUFRO0NBQzNCLElBQUksTUFBTSxTQUFTLFdBQVcsQ0FBQyxNQUFNLE9BQU8sUUFBUTtFQUNsRCxJQUFJLFNBQVM7R0FBRSxNQUFNO0dBQVUsU0FBUztHQUFpQyxNQUFNLENBQUMsT0FBTztFQUFFLENBQUM7Q0FDNUY7Q0FDQSxJQUFJLE1BQU0sU0FBUyxhQUFhLENBQUMsTUFBTSxTQUFTO0VBQzlDLElBQUksU0FBUztHQUFFLE1BQU07R0FBVSxTQUFTO0dBQXdCLE1BQU0sQ0FBQyxTQUFTO0VBQUUsQ0FBQztDQUNyRjtDQUNBLElBQUksTUFBTSxTQUFTLFdBQVcsTUFBTSxPQUFPO0VBQ3pDLElBQUksU0FBUztHQUNYLE1BQU07R0FDTixTQUFTO0dBQ1QsTUFBTSxDQUFDLE9BQU87RUFDaEIsQ0FBQztDQUNIO0NBQ0EsSUFBSSxNQUFNLFNBQVMsUUFBUTtFQUN6QixJQUFJLENBQUMsTUFBTSxNQUFNO0dBQ2YsSUFBSSxTQUFTO0lBQUUsTUFBTTtJQUFVLFNBQVM7SUFBd0IsTUFBTSxDQUFDLE1BQU07R0FBRSxDQUFDO0VBQ2xGO0NBQ0Y7QUFDRixDQUFDO0FBSUksTUFBTSx5QkFBeUI7Q0FBQztDQUFZO0NBQWE7Q0FBVztBQUFROztBQUc1RSxNQUFNLDBCQUEwQixzQkFBRSxPQUFPO0NBQzlDLFdBQVcsc0JBQUUsT0FBTztDQUNwQixTQUFTLHNCQUFFLEtBQUssc0JBQXNCO0NBQ3RDLGFBQWEsc0JBQUUsT0FBTyxDQUFDLENBQUMsU0FBUzs7Ozs7Q0FLakMsU0FBUyxzQkFBRSxPQUFPLHNCQUFFLE9BQU8sR0FBRyxzQkFBRSxPQUFPLENBQUMsQ0FBQyxDQUFDLFNBQVM7O0NBRW5ELFFBQVEsc0JBQUUsT0FBTyxDQUFDLENBQUMsU0FBUztBQUM5QixDQUFDIiwibmFtZXMiOltdLCJpZ25vcmVMaXN0IjpbXSwic291cmNlcyI6WyJyb3V0aW5lLXdhdGNoLnRzIl0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCAqIGFzIHogZnJvbSBcInpvZFwiO1xuXG4vKipcbiAqIEEgcm91dGluZSB0aGF0IHN0YXJ0cyBcIndoZW4gc29tZXRoaW5nIGNoYW5nZXNcIi4gQSBjaGVja2VyLCBub3QgYSBtb2RlbCxcbiAqIHRha2VzIGEgZmluZ2VycHJpbnQgb2YgdGhlIHdhdGNoZWQgdGhpbmcgb24gYW4gaW50ZXJ2YWw7IHRoZSByb3V0aW5lIG9ubHlcbiAqIHJ1bnMgd2hlbiB0aGUgZmluZ2VycHJpbnQgZGlmZmVycyBmcm9tIHRoZSBsYXN0IG9uZS5cbiAqXG4gKiAtIGBmaWxlc2A6IHBhdGhzIG9uIHRoZSBib3QncyBjb21wdXRlciAocmVsYXRpdmUgcGF0aHMgcmVzb2x2ZSBpbnRvIHRoZVxuICogICBib3QncyBvd24gZm9sZGVyKS4gTmFtZXMsIHNpemVzIGFuZCBtb2RpZmllZCB0aW1lcyBhcmUgY29tcGFyZWQuXG4gKiAtIGBjb21tYW5kYDogYSBzaGVsbCBjb21tYW5kIG9uIHRoZSBib3QncyBjb21wdXRlcjsgaXRzIG91dHB1dCBpcyB0aGVcbiAqICAgZmluZ2VycHJpbnQuIEl0IHJ1bnMgZXZlcnkgaW50ZXJ2YWwgaW4gdGhlIGJvdCdzIGZvbGRlciwgd2l0aG91dCBhIG1vZGVsXG4gKiAgIG9yIHBlci1ydW4gYXBwcm92YWwsIGVxdWl2YWxlbnQgdG8gdGhlIGJvdCBydW5uaW5nIHRoZSBjb21tYW5kIGl0c2VsZi5cbiAqICAgQSBub24temVybyBleGl0IGlzIGEgZmFpbGVkIGNoZWNrLlxuICogLSBgdG9vbGA6IGEgcmVhZC1vbmx5IHRvb2wgZnJvbSBhIGNvbm5lY3RlZCBpbnRlZ3JhdGlvbiwgY2FsbGVkIHdpdGggZml4ZWRcbiAqICAgYXJndW1lbnRzOyBpdHMgcmVzdWx0IGlzIHRoZSBmaW5nZXJwcmludC5cbiAqXG4gKiBgdHJhY2tgICh0b29sIGFuZCBjb21tYW5kKSBuYXJyb3dzIGEgSlNPTiByZXN1bHQgdG8gaXRzIGl0ZW1zOiBvYmplY3RzIHRoYXRcbiAqIGNhcnJ5IHRoZSBmaXJzdCBmaWVsZCBhcmUgY29tcGFyZWQgYnkgdGhlIGxpc3RlZCBmaWVsZHMgb25seSwgc28gYSBmZXRjaFxuICogdGltZSBvciBhIHNuaXBwZXQgZG9lcyBub3QgY291bnQgYXMgYSBjaGFuZ2UsIGFuZCB0aGUgbm90ZSBjYW4gc2F5IHdoaWNoXG4gKiBpdGVtcyBhcmUgbmV3LCB1cGRhdGVkIG9yIGdvbmUuXG4gKi9cbmV4cG9ydCBjb25zdCBST1VUSU5FX1dBVENIX0tJTkRTID0gW1wiZmlsZXNcIiwgXCJjb21tYW5kXCIsIFwidG9vbFwiXSBhcyBjb25zdDtcbmV4cG9ydCBjb25zdCBST1VUSU5FX1dBVENIX0RFRkFVTFRfTUlOVVRFUyA9IDE1O1xuLyoqIEtlZXAgdW5hdHRlbmRlZCBjaGVja3MgZnJvbSBoYW1tZXJpbmcgY29tcHV0ZXJzIG9yIGNvbm5lY3RlZCBzZXJ2aWNlcy4gKi9cbmV4cG9ydCBjb25zdCBST1VUSU5FX1dBVENIX01JTl9NSU5VVEVTID0gNTtcblxuZXhwb3J0IGNvbnN0IFJvdXRpbmVXYXRjaFNjaGVtYSA9IHpcbiAgLm9iamVjdCh7XG4gICAga2luZDogei5lbnVtKFJPVVRJTkVfV0FUQ0hfS0lORFMpLFxuICAgIHBhdGhzOiB6LmFycmF5KHouc3RyaW5nKCkudHJpbSgpLm1pbigxKS5tYXgoNTAwKSkubWluKDEpLm1heCgyMCkub3B0aW9uYWwoKSxcbiAgICBjb21tYW5kOiB6LnN0cmluZygpLnRyaW0oKS5taW4oMSkubWF4KDIwMDApLm9wdGlvbmFsKCksXG4gICAgdG9vbDogei5zdHJpbmcoKS50cmltKCkubWluKDEpLm1heCgyMDApLm9wdGlvbmFsKCksXG4gICAgYXJnczogei5yZWNvcmQoei5zdHJpbmcoKSwgei51bmtub3duKCkpLm9wdGlvbmFsKCksXG4gICAgdHJhY2s6IHouYXJyYXkoei5zdHJpbmcoKS50cmltKCkubWluKDEpLm1heCgxMDApKS5taW4oMSkubWF4KDUpLm9wdGlvbmFsKCksXG4gICAgZXZlcnlNaW51dGVzOiB6XG4gICAgICAubnVtYmVyKClcbiAgICAgIC5pbnQoKVxuICAgICAgLm1pbihST1VUSU5FX1dBVENIX01JTl9NSU5VVEVTKVxuICAgICAgLm1heCgxNDQwKVxuICAgICAgLmRlZmF1bHQoUk9VVElORV9XQVRDSF9ERUZBVUxUX01JTlVURVMpLFxuICAgIC8qKiBQb3N0IFwiTm8gY2hhbmdlc1wiIGluIGNoYXQgb24gZXZlcnkgcXVpZXQgY2hlY2ssIG5vdCBvbmx5IGluIGhpc3RvcnkuICovXG4gICAgbG91ZDogei5ib29sZWFuKCkuZGVmYXVsdChmYWxzZSksXG4gIH0pXG4gIC5zdXBlclJlZmluZSgodmFsdWUsIGN0eCkgPT4ge1xuICAgIGlmICh2YWx1ZS5raW5kID09PSBcImZpbGVzXCIgJiYgIXZhbHVlLnBhdGhzPy5sZW5ndGgpIHtcbiAgICAgIGN0eC5hZGRJc3N1ZSh7IGNvZGU6IFwiY3VzdG9tXCIsIG1lc3NhZ2U6IFwiQWRkIGEgZmlsZSBvciBmb2xkZXIgdG8gd2F0Y2hcIiwgcGF0aDogW1wicGF0aHNcIl0gfSk7XG4gICAgfVxuICAgIGlmICh2YWx1ZS5raW5kID09PSBcImNvbW1hbmRcIiAmJiAhdmFsdWUuY29tbWFuZCkge1xuICAgICAgY3R4LmFkZElzc3VlKHsgY29kZTogXCJjdXN0b21cIiwgbWVzc2FnZTogXCJBZGQgYSBjb21tYW5kIHRvIHJ1blwiLCBwYXRoOiBbXCJjb21tYW5kXCJdIH0pO1xuICAgIH1cbiAgICBpZiAodmFsdWUua2luZCA9PT0gXCJmaWxlc1wiICYmIHZhbHVlLnRyYWNrKSB7XG4gICAgICBjdHguYWRkSXNzdWUoe1xuICAgICAgICBjb2RlOiBcImN1c3RvbVwiLFxuICAgICAgICBtZXNzYWdlOiBcIlRyYWNrZWQgZmllbGRzIGFwcGx5IHRvIGEgY29tbWFuZCBvciB0b29sXCIsXG4gICAgICAgIHBhdGg6IFtcInRyYWNrXCJdLFxuICAgICAgfSk7XG4gICAgfVxuICAgIGlmICh2YWx1ZS5raW5kID09PSBcInRvb2xcIikge1xuICAgICAgaWYgKCF2YWx1ZS50b29sKSB7XG4gICAgICAgIGN0eC5hZGRJc3N1ZSh7IGNvZGU6IFwiY3VzdG9tXCIsIG1lc3NhZ2U6IFwiUGljayBhIHRvb2wgdG8gY2hlY2tcIiwgcGF0aDogW1widG9vbFwiXSB9KTtcbiAgICAgIH1cbiAgICB9XG4gIH0pO1xuZXhwb3J0IHR5cGUgUm91dGluZVdhdGNoID0gei5pbmZlcjx0eXBlb2YgUm91dGluZVdhdGNoU2NoZW1hPjtcbmV4cG9ydCB0eXBlIFJvdXRpbmVXYXRjaElucHV0ID0gei5pbnB1dDx0eXBlb2YgUm91dGluZVdhdGNoU2NoZW1hPjtcblxuZXhwb3J0IGNvbnN0IFJPVVRJTkVfV0FUQ0hfT1VUQ09NRVMgPSBbXCJiYXNlbGluZVwiLCBcInVuY2hhbmdlZFwiLCBcImNoYW5nZWRcIiwgXCJmYWlsZWRcIl0gYXMgY29uc3Q7XG5cbi8qKiBXaGF0IHRoZSBsYXN0IGNoZWNrIHNhdy4gV3JpdHRlbiBieSB0aGUgY2hlY2tlciwgbmV2ZXIgYnkgY2xpZW50cy4gKi9cbmV4cG9ydCBjb25zdCBSb3V0aW5lV2F0Y2hTdGF0ZVNjaGVtYSA9IHoub2JqZWN0KHtcbiAgY2hlY2tlZEF0OiB6LnN0cmluZygpLFxuICBvdXRjb21lOiB6LmVudW0oUk9VVElORV9XQVRDSF9PVVRDT01FUyksXG4gIGZpbmdlcnByaW50OiB6LnN0cmluZygpLm51bGxhYmxlKCksXG4gIC8qKlxuICAgKiBmaWxlczogcGF0aCAtPiBcInNpemU6bXRpbWVcIjsgdHJhY2tlZCBpdGVtczogaWRlbnRpdHkgLT4gdGhlaXIgdHJhY2tlZCBmaWVsZHMgYW5kIHRpdGxlLlxuICAgKiBLZXB0IHNvIGEgY2hhbmdlIGNhbiBiZSBkZXNjcmliZWQsIG5vdCBqdXN0IGRldGVjdGVkLlxuICAgKi9cbiAgZW50cmllczogei5yZWNvcmQoei5zdHJpbmcoKSwgei5zdHJpbmcoKSkub3B0aW9uYWwoKSxcbiAgLyoqIFdoYXQgY2hhbmdlZCwgb3Igd2h5IHRoZSBjaGVjayBmYWlsZWQsIGluIGEgc2VudGVuY2Ugb3IgYSBzaG9ydCBsaXN0LiAqL1xuICBkZXRhaWw6IHouc3RyaW5nKCkubnVsbGFibGUoKSxcbn0pO1xuZXhwb3J0IHR5cGUgUm91dGluZVdhdGNoU3RhdGUgPSB6LmluZmVyPHR5cGVvZiBSb3V0aW5lV2F0Y2hTdGF0ZVNjaGVtYT47XG4iXSwiZmlsZSI6Ii9wYWNrYWdlcy9jb250cmFjdHMvc3JjL3JvdXRpbmUtd2F0Y2gudHMifQ==
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvY29udHJhY3RzL3NyYy9yb3V0aW5lLXdhdGNoLnRzIiwiL3BhY2thZ2VzL2NvbnRyYWN0cy9zcmMvcm91dGluZS13YXRjaC50cyIsW11d

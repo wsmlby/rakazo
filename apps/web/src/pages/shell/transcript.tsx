@@ -79,6 +79,7 @@ export const Transcript = memo(function Transcript({
   speakingMessageId,
   onSpeak,
   onOpenComputer,
+  canManageBot = true,
 }: {
   scrollRef: RefObject<HTMLDivElement | null>;
   scrollRequest: { messageId: string; nonce: number } | null;
@@ -121,6 +122,7 @@ export const Transcript = memo(function Transcript({
   speakingMessageId: string | null;
   onSpeak: (message: ThreadMessage) => void;
   onOpenComputer: (botId?: string) => void;
+  canManageBot?: boolean;
 }) {
   const { t } = useLingui();
   const [atEnd, setAtEnd] = useState(true);
@@ -533,6 +535,7 @@ export const Transcript = memo(function Transcript({
                       speaking={speakingMessageId === message.id}
                       onSpeak={() => onSpeak(message)}
                       onOpenComputer={onOpenComputer}
+                      canManageBot={canManageBot}
                       showToolActivity={showToolActivity}
                       onReply={onReply}
                       onMarkUnread={onMarkUnread}

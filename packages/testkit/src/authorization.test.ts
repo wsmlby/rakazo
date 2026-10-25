@@ -97,9 +97,18 @@ describeWithDatabase("API authorization and resource isolation", () => {
       ["spaces/create", { name: "Nope" }],
       ["spaces/rename", { spaceId: "missing-space", name: "Nope" }],
       ["spaces/remove", { spaceId: "missing-space" }],
+      ["companyInvitations/create", {}],
+      ["companyInvitations/capabilities"],
+      ["companyInvitations/preview", { token: "A".repeat(43) }],
+      ["companyInvitations/accept", { token: "A".repeat(43) }],
+      ["companyInvitations/revoke", { invitationId: "missing-invitation" }],
       ["bots/list"],
       ["bots/listArchived"],
       ["bots/get", { botId: "missing-bot" }],
+      ["bots/sharing/get", { botId: "missing-bot" }],
+      ["bots/sharing/grant", { botId: "missing-bot", userId: "missing-user" }],
+      ["bots/sharing/revoke", { botId: "missing-bot", userId: "missing-user" }],
+      ["bots/sharing/transfer", { botId: "missing-bot", userId: "missing-user" }],
       ["bots/create", botInput("Unauthenticated")],
       ["bots/duplicate", { botId: "missing-bot" }],
       ["bots/update", { botId: "missing-bot", name: "Nope" }],
@@ -492,6 +501,319 @@ describeWithDatabase("API authorization and resource isolation", () => {
     expect(
       await asSystem(handles.prisma).bot.findUnique({ where: { id: ownerBot.id } }),
     ).not.toBeNull();
+  });
+
+  it("shares only the selected bot without granting ownership or workstation access", async () => {
+    const owner = await signup(app, `shared-owner-${stamp}@rakazo.test`, "Bot Owner");
+    const coworker = await signup(app, `shared-coworker-${stamp}@rakazo.test`, "Coworker");
+    const outsider = await signup(app, `shared-outsider-${stamp}@rakazo.test`, "Outsider");
+    const ownerActor = await rpc<Actor>(app, owner, "me");
+    const coworkerActor = await rpc<Actor>(app, coworker, "me");
+    const outsiderActor = await rpc<Actor>(app, outsider, "me");
+    const space = await handles.prisma.space.findUniqueOrThrow({
+      where: { id: ownerActor.spaceId },
+    });
+    await handles.prisma.member.create({
+      data: {
+        id: `shared-company-member-${stamp}`,
+        organizationId: space.organizationId,
+        userId: coworkerActor.userId,
+        role: "member",
+        createdAt: new Date(),
+      },
+    });
+    await handles.prisma.spaceMember.upsert({
+      where: { spaceId_userId: { spaceId: space.id, userId: coworkerActor.userId } },
+      update: {},
+      create: {
+        id: `shared-space-member-${stamp}`,
+        spaceId: space.id,
+        organizationId: space.organizationId,
+        userId: coworkerActor.userId,
+        role: "member",
+        createdAt: new Date(),
+      },
+    });
+    const shared = await rpc<Bot>(app, owner, "bots/create", {
+      ...botInput("Shared employee"),
+      computerMode: "dedicated",
+      fleetManagement: false,
+      memoryScope: "isolated",
+    });
+    const privateBot = await rpc<Bot>(app, owner, "bots/create", botInput("Unshared employee"));
+    await rpc(app, owner, "bots/update", { botId: shared.id, pinned: true });
+    await expectDenied(app, coworker, "bots/get", { botId: shared.id }, space.id);
+    await expectDenied(app, owner, "bots/sharing/grant", {
+      botId: shared.id,
+      userId: outsiderActor.userId,
+    });
+    const available = await rpc<{ eligibleMembers: Array<{ userId: string }> }>(
+      app,
+      owner,
+      "bots/sharing/get",
+      { botId: shared.id },
+    );
+    expect(available.eligibleMembers).toContainEqual(
+      expect.objectContaining({ userId: coworkerActor.userId }),
+    );
+    expect(available.eligibleMembers).not.toContainEqual(
+      expect.objectContaining({ userId: outsiderActor.userId }),
+    );
+    await rpc(app, owner, "bots/sharing/grant", {
+      botId: shared.id,
+      userId: coworkerActor.userId,
+    });
+    expect(await rpc(app, coworker, "bots/get", { botId: shared.id }, space.id)).toMatchObject({
+      id: shared.id,
+      ownerUserId: ownerActor.userId,
+      accessRole: "collaborator",
+    });
+    expect(await rpc<Array<{ id: string }>>(app, coworker, "bots/list", {}, space.id)).toEqual([
+      expect.objectContaining({ id: shared.id }),
+    ]);
+    await rpc(app, coworker, "bots/update", { botId: shared.id, autoSpeak: true }, space.id);
+    const coworkerSection = await rpc<{ id: string }>(
+      app,
+      coworker,
+      "botSections/create",
+      { botId: shared.id, name: "Coworker section" },
+      space.id,
+    );
+    expect(await rpc(app, coworker, "bots/get", { botId: shared.id }, space.id)).toMatchObject({
+      autoSpeak: true,
+      sectionId: coworkerSection.id,
+    });
+    expect(await rpc(app, owner, "bots/get", { botId: shared.id })).toMatchObject({
+      autoSpeak: false,
+      sectionId: null,
+    });
+    const coworkerBot = await rpc<Bot>(
+      app,
+      coworker,
+      "bots/create",
+      botInput("Coworker employee"),
+      space.id,
+    );
+    await rpc(app, coworker, "bots/reorder", { botIds: [shared.id, coworkerBot.id] }, space.id);
+    expect(
+      (await rpc<Array<{ id: string }>>(app, coworker, "bots/list", {}, space.id)).map(
+        (bot) => bot.id,
+      ),
+    ).toEqual([shared.id, coworkerBot.id]);
+    await rpc(app, coworker, "threads/get", { botId: shared.id }, space.id);
+    await rpc(app, owner, "models/connect", {
+      provider: "xai",
+      apiKey: "fake-shared-bot-model-key",
+      label: "Bot funding",
+      modelId: "grok-4.6",
+    });
+    const sent = await rpc<{ runId: string }>(
+      app,
+      coworker,
+      "threads/send",
+      { botId: shared.id, text: "Prepare the shared work", clientNonce: "coworker-request" },
+      space.id,
+    );
+    const requestedRun = await db.run.findUniqueOrThrow({
+      where: { id: sent.runId },
+      select: { userId: true, requesterUserId: true, task: true, sourceMessage: true },
+    });
+    expect(requestedRun).toMatchObject({
+      userId: ownerActor.userId,
+      requesterUserId: coworkerActor.userId,
+      task: { userId: ownerActor.userId, requesterUserId: coworkerActor.userId },
+      sourceMessage: { authorUserId: coworkerActor.userId, authorName: "Coworker" },
+    });
+    const snapshot = await rpc<{ messages: Array<{ id: string; authorUserId?: string }> }>(
+      app,
+      owner,
+      "threads/get",
+      { botId: shared.id },
+    );
+    expect(snapshot.messages).toContainEqual(
+      expect.objectContaining({
+        id: requestedRun.sourceMessage?.id,
+        authorUserId: coworkerActor.userId,
+      }),
+    );
+    await rpc(app, owner, "bots/sharing/grant", {
+      botId: shared.id,
+      userId: coworkerActor.userId,
+      canApprove: true,
+    });
+    expect(
+      await rpc<{ members: Array<{ userId: string; canApprove: boolean }> }>(
+        app,
+        owner,
+        "bots/sharing/get",
+        { botId: shared.id },
+      ),
+    ).toMatchObject({
+      members: [{ userId: coworkerActor.userId, canApprove: true }],
+    });
+    await rpc(app, owner, "bots/sharing/grant", {
+      botId: shared.id,
+      userId: coworkerActor.userId,
+      canApprove: false,
+    });
+    const waitingThread = await db.thread.update({
+      where: { botId: shared.id },
+      data: { nextMessageSeq: { increment: 1 } },
+    });
+    const question = await db.message.create({
+      data: {
+        threadId: waitingThread.id,
+        seq: waitingThread.nextMessageSeq - 1,
+        role: "bot",
+        botId: shared.id,
+        runId: sent.runId,
+        blocks: [{ kind: "ask", text: "Which project?", status: "pending" }],
+      },
+    });
+    await db.run.update({ where: { id: sent.runId }, data: { status: "waiting_input" } });
+    await rpc(
+      app,
+      coworker,
+      "threads/answer",
+      {
+        botId: shared.id,
+        runId: sent.runId,
+        messageId: question.id,
+        answer: "The shared project",
+      },
+      space.id,
+    );
+    expect(
+      await db.run.findUniqueOrThrow({
+        where: { id: sent.runId },
+        select: { status: true },
+      }),
+    ).toEqual({ status: "queued" });
+    const deniedCalls: Array<[string, unknown]> = [
+      ["bots/get", { botId: privateBot.id }],
+      ["bots/update", { botId: shared.id, name: "Changed by coworker" }],
+      ["bots/archive", { botId: shared.id }],
+      ["bots/remove", { botId: shared.id }],
+      ["bots/setComputer", { botId: shared.id, mode: "team" }],
+      ["bots/sharing/get", { botId: shared.id }],
+      ["bots/sharing/grant", { botId: shared.id, userId: outsiderActor.userId }],
+      ["bots/sharing/revoke", { botId: shared.id, userId: coworkerActor.userId }],
+      ["bots/sharing/transfer", { botId: shared.id, userId: coworkerActor.userId }],
+      ["threads/clear", { botId: shared.id }],
+      ["computer/boot", { botId: shared.id }],
+      ["computer/files", { botId: shared.id, path: "/" }],
+      ["routines/create", routineInput(shared.id)],
+    ];
+    for (const [procedure, input] of deniedCalls) {
+      await expectDenied(app, coworker, procedure, input, space.id);
+    }
+    await rpc(app, coworker, "threads/markUnread", { botId: shared.id }, space.id);
+    await rpc(app, owner, "threads/markRead", { botId: shared.id });
+    expect(await rpc(app, coworker, "bots/get", { botId: shared.id }, space.id)).toMatchObject({
+      unread: true,
+      pinned: false,
+    });
+    expect(await rpc(app, owner, "bots/get", { botId: shared.id })).toMatchObject({
+      unread: false,
+      pinned: true,
+      notifyOnFinish: false,
+    });
+    await rpc(app, owner, "bots/sharing/revoke", {
+      botId: shared.id,
+      userId: coworkerActor.userId,
+    });
+    expect(
+      await db.run.findUniqueOrThrow({
+        where: { id: sent.runId },
+        select: { status: true, requesterUserId: true },
+      }),
+    ).toEqual({ status: "cancelled", requesterUserId: coworkerActor.userId });
+    expect(
+      await db.message.findUniqueOrThrow({
+        where: { id: requestedRun.sourceMessage!.id },
+        select: { authorUserId: true },
+      }),
+    ).toEqual({ authorUserId: coworkerActor.userId });
+    await expectDenied(app, coworker, "bots/get", { botId: shared.id }, space.id);
+    await expectDenied(app, coworker, "threads/get", { botId: shared.id }, space.id);
+    await expectDenied(
+      app,
+      coworker,
+      "threads/send",
+      { botId: shared.id, text: "Access was revoked" },
+      space.id,
+    );
+    expect(await rpc<Array<{ id: string }>>(app, coworker, "bots/list", {}, space.id)).toEqual([
+      expect.objectContaining({ id: coworkerBot.id }),
+    ]);
+    expect(
+      await db.bot.findUniqueOrThrow({ where: { id: shared.id }, select: { userId: true } }),
+    ).toEqual({ userId: ownerActor.userId });
+    const memory = await db.memoryDocument.create({
+      data: {
+        spaceId: space.id,
+        userId: ownerActor.userId,
+        botId: shared.id,
+        scope: "bot",
+        path: "EMPLOYEE.md",
+        content: "The bot keeps this knowledge when its manager changes.",
+      },
+    });
+    await rpc(app, owner, "bots/sharing/grant", {
+      botId: shared.id,
+      userId: coworkerActor.userId,
+    });
+    await rpc(app, owner, "bots/sharing/transfer", {
+      botId: shared.id,
+      userId: coworkerActor.userId,
+    });
+    expect(await rpc(app, coworker, "bots/get", { botId: shared.id }, space.id)).toMatchObject({
+      id: shared.id,
+      ownerUserId: coworkerActor.userId,
+      accessRole: "owner",
+    });
+    expect(await rpc(app, owner, "bots/get", { botId: shared.id })).toMatchObject({
+      accessRole: "collaborator",
+    });
+    expect(
+      await rpc<Array<{ id: string }>>(
+        app,
+        coworker,
+        "memory/list",
+        { botId: shared.id },
+        space.id,
+      ),
+    ).toContainEqual(expect.objectContaining({ id: memory.id }));
+    await expectDenied(app, owner, "bots/update", { botId: shared.id, name: "Former manager" });
+    await runAsTenant(ownerActor, () =>
+      handles.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SET LOCAL ROLE rakazo_app`;
+        await tx.$queryRaw`SELECT set_config('app.rls_version', '2', true)`;
+        expect(
+          await tx.run.findUnique({ where: { id: sent.runId }, select: { id: true } }),
+        ).toBeNull();
+        await tx.$queryRaw`SELECT set_config('app.rls_version', '3', true)`;
+        expect(await tx.bot.findUnique({ where: { id: shared.id }, select: { id: true } })).toEqual(
+          { id: shared.id },
+        );
+      }),
+    );
+    await runAsTenant({ userId: coworkerActor.userId, spaceId: space.id }, () =>
+      handles.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SET LOCAL ROLE rakazo_app`;
+        await tx.$queryRaw`SELECT set_config('app.rls_version', '2', true)`;
+        expect(
+          await tx.run.findUnique({ where: { id: sent.runId }, select: { id: true } }),
+        ).toBeNull();
+        await tx.$queryRaw`SELECT set_config('app.rls_version', '3', true)`;
+        expect(
+          await tx.bot.findMany({
+            where: { id: { in: [shared.id, privateBot.id] } },
+            select: { id: true },
+          }),
+        ).toEqual([{ id: shared.id }]);
+      }),
+    );
   });
 
   it("hands a device's push token to the account that registers it last", async () => {

@@ -1,0 +1,22 @@
+__vite_ssr_exportName__("createRowId", () => { try { return createRowId } catch {} });
+const __vite_ssr_import_0__ = await __vite_ssr_import__("node:crypto", {"importedNames":["randomBytes","randomInt"]});
+
+const BLOCK = 36 ** 4;
+let counter = (0,__vite_ssr_import_0__.randomInt)(BLOCK);
+const fingerprint = (0,__vite_ssr_import_0__.randomInt)(BLOCK).toString(36).padStart(4, "0");
+/**
+* Collision-resistant ids shaped like Prisma's `cuid()` defaults (25 characters,
+* time-ordered prefix). Encrypted rows need their id before the insert because
+* the id is bound into each ciphertext.
+*/
+function createRowId() {
+	counter = (counter + 1) % BLOCK;
+	const time = Date.now().toString(36).padStart(8, "0").slice(-8);
+	const count = counter.toString(36).padStart(4, "0");
+	const random = ((0,__vite_ssr_import_0__.randomBytes)(6).readUIntBE(0, 6) % 36 ** 8).toString(36).padStart(8, "0");
+	return `c${time}${count}${fingerprint}${random}`;
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTtBQUFBOztBQUVBLE1BQU0sUUFBUSxNQUFNO0FBQ3BCLElBQUksVUFBVSxvQ0FBVSxLQUFLO0FBQzdCLE1BQU0sY0FBYyxvQ0FBVSxLQUFLLENBQUMsQ0FBQyxTQUFTLEVBQUUsQ0FBQyxDQUFDLFNBQVMsR0FBRyxHQUFHOzs7Ozs7QUFPMUQsU0FBUyxjQUFzQjtDQUNwQyxXQUFXLFVBQVUsS0FBSztDQUMxQixNQUFNLE9BQU8sS0FBSyxJQUFJLENBQUMsQ0FBQyxTQUFTLEVBQUUsQ0FBQyxDQUFDLFNBQVMsR0FBRyxHQUFHLENBQUMsQ0FBQyxNQUFNLENBQUMsQ0FBQztDQUM5RCxNQUFNLFFBQVEsUUFBUSxTQUFTLEVBQUUsQ0FBQyxDQUFDLFNBQVMsR0FBRyxHQUFHO0NBQ2xELE1BQU0sVUFBVSxzQ0FBWSxDQUFDLENBQUMsQ0FBQyxXQUFXLEdBQUcsQ0FBQyxJQUFJLE1BQU0sRUFBQyxDQUFFLFNBQVMsRUFBRSxDQUFDLENBQUMsU0FBUyxHQUFHLEdBQUc7Q0FDdkYsT0FBTyxJQUFJLE9BQU8sUUFBUSxjQUFjO0FBQzFDIiwibmFtZXMiOltdLCJpZ25vcmVMaXN0IjpbXSwic291cmNlcyI6WyJyb3ctaWQudHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgcmFuZG9tQnl0ZXMsIHJhbmRvbUludCB9IGZyb20gXCJub2RlOmNyeXB0b1wiO1xuXG5jb25zdCBCTE9DSyA9IDM2ICoqIDQ7XG5sZXQgY291bnRlciA9IHJhbmRvbUludChCTE9DSyk7XG5jb25zdCBmaW5nZXJwcmludCA9IHJhbmRvbUludChCTE9DSykudG9TdHJpbmcoMzYpLnBhZFN0YXJ0KDQsIFwiMFwiKTtcblxuLyoqXG4gKiBDb2xsaXNpb24tcmVzaXN0YW50IGlkcyBzaGFwZWQgbGlrZSBQcmlzbWEncyBgY3VpZCgpYCBkZWZhdWx0cyAoMjUgY2hhcmFjdGVycyxcbiAqIHRpbWUtb3JkZXJlZCBwcmVmaXgpLiBFbmNyeXB0ZWQgcm93cyBuZWVkIHRoZWlyIGlkIGJlZm9yZSB0aGUgaW5zZXJ0IGJlY2F1c2VcbiAqIHRoZSBpZCBpcyBib3VuZCBpbnRvIGVhY2ggY2lwaGVydGV4dC5cbiAqL1xuZXhwb3J0IGZ1bmN0aW9uIGNyZWF0ZVJvd0lkKCk6IHN0cmluZyB7XG4gIGNvdW50ZXIgPSAoY291bnRlciArIDEpICUgQkxPQ0s7XG4gIGNvbnN0IHRpbWUgPSBEYXRlLm5vdygpLnRvU3RyaW5nKDM2KS5wYWRTdGFydCg4LCBcIjBcIikuc2xpY2UoLTgpO1xuICBjb25zdCBjb3VudCA9IGNvdW50ZXIudG9TdHJpbmcoMzYpLnBhZFN0YXJ0KDQsIFwiMFwiKTtcbiAgY29uc3QgcmFuZG9tID0gKHJhbmRvbUJ5dGVzKDYpLnJlYWRVSW50QkUoMCwgNikgJSAzNiAqKiA4KS50b1N0cmluZygzNikucGFkU3RhcnQoOCwgXCIwXCIpO1xuICByZXR1cm4gYGMke3RpbWV9JHtjb3VudH0ke2ZpbmdlcnByaW50fSR7cmFuZG9tfWA7XG59XG4iXSwiZmlsZSI6Ii9wYWNrYWdlcy9kYi9zcmMvcm93LWlkLnRzIn0=
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvZGIvc3JjL3Jvdy1pZC50cyIsIi9wYWNrYWdlcy9kYi9zcmMvcm93LWlkLnRzIixbXV0=

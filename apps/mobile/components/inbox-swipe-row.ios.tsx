@@ -41,6 +41,7 @@ export function InboxSwipeRow({
   rowKey,
   unread,
   pinned,
+  accessRole,
   notifyOnFinish,
   sectionId,
   sections,
@@ -55,7 +56,7 @@ export function InboxSwipeRow({
   const window = useWindowDimensions();
   const [width, setWidth] = useState(window.width);
   const [height, setHeight] = useState(() => rowHeights.get(rowKey) ?? lastRowHeight);
-  const actions = inboxRowActions({ unread, pinned });
+  const actions = inboxRowActions({ unread, pinned, accessRole });
 
   function button(action: InboxRowAction, swipe = true) {
     const { label, systemImage } = INBOX_ROW_ACTIONS[action];
@@ -160,8 +161,8 @@ export function InboxSwipeRow({
                     />
                   ) : null}
                 </Menu>
-                {button("archive", false)}
-                {button("delete", false)}
+                {accessRole !== "collaborator" ? button("archive", false) : null}
+                {accessRole !== "collaborator" ? button("delete", false) : null}
               </ContextMenu.Items>
             </ContextMenu>
             <SwipeActions.Actions edge="leading">{button(actions.leading)}</SwipeActions.Actions>

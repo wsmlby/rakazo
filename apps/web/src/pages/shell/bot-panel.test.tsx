@@ -611,9 +611,11 @@ it("uses the empty label placeholder and cancels an inline name edit", async () 
 
 it("opens Advanced for a model deep link and focuses the model control", async () => {
   await render("", {}, false, 1);
-  expect(container.querySelector("button[aria-expanded]")?.getAttribute("aria-expanded")).toBe(
-    "true",
-  );
+  expect(
+    container
+      .querySelector('[data-testid="bot-settings-advanced"] button[aria-expanded]')
+      ?.getAttribute("aria-expanded"),
+  ).toBe("true");
   expect(document.activeElement?.id.endsWith("-model")).toBe(true);
 });
 

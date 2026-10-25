@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { ArtifactStore, MessagingInboundAttachment } from "@rakazo/adapter-kit";
-import type { Actor } from "@rakazo/contracts";
+import type { Actor, MessageBlock } from "@rakazo/contracts";
 import {
   ARTIFACT_NAME_MAX_LENGTH,
   ATTACHMENT_MAX_BYTES,
@@ -17,7 +17,7 @@ import {
   validateAttachmentMimeType,
 } from "@rakazo/core";
 import type { PrismaClient } from "@rakazo/db";
-import { IsolationError, Prisma, withResolvedArtifactVersion } from "@rakazo/db";
+import { getAccessibleBot, IsolationError, Prisma, withResolvedArtifactVersion } from "@rakazo/db";
 
 function adapterContext(actor: ArtifactOwner, botId: string, operationId: string) {
   return {
@@ -249,16 +249,48 @@ export async function getSpaceArtifactById(
     artifacts: ArtifactStore;
   },
   actor: Actor,
-  input: { artifactId: string },
+  input: { artifactId: string; botId?: string },
 ) {
   const row = await deps.prisma.artifact.findFirst({
     where: {
       id: input.artifactId,
       spaceId: actor.spaceId,
-      userId: actor.userId,
+      ...(input.botId ? { botId: input.botId } : {}),
     },
   });
   if (!row) throw new IsolationError();
+  if (row.botId) {
+    const bot = await getAccessibleBot(deps.prisma, actor, row.botId, { includeArchived: true });
+    if (row.userId !== actor.userId) {
+      if (!bot.collaborationRestricted || row.groupId || !bot.thread) throw new IsolationError();
+      // Only posted attachments are shared. Never expose a bot's unposted files or uploads.
+      let before: number | undefined;
+      let referenced = false;
+      while (!referenced) {
+        const messages = await deps.prisma.message.findMany({
+          where: {
+            threadId: bot.thread.id,
+            ...(before === undefined ? {} : { seq: { lt: before } }),
+          },
+          select: { seq: true, blocks: true },
+          orderBy: { seq: "desc" },
+          take: 100,
+        });
+        referenced = messages.some((message) =>
+          (message.blocks as MessageBlock[]).some(
+            (block) =>
+              (block.kind === "image" || block.kind === "file") && block.artifactId === row.id,
+          ),
+        );
+        if (referenced || messages.length < 100) break;
+        before = messages[messages.length - 1]!.seq;
+      }
+      if (!referenced) throw new IsolationError();
+      await getAccessibleBot(deps.prisma, actor, row.botId, { includeArchived: true });
+    }
+  } else if (row.userId !== actor.userId) {
+    throw new IsolationError();
+  }
   return readArtifact(deps.artifacts, actor, row, row.botId ?? row.groupId ?? row.id);
 }
 

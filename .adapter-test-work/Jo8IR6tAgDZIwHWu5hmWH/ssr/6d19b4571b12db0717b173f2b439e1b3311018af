@@ -1,0 +1,124 @@
+__vite_ssr_exportName__("dispatcherFetch", () => { try { return dispatcherFetch } catch {} });
+__vite_ssr_exportName__("fetchPairedWithDispatcher", () => { try { return fetchPairedWithDispatcher } catch {} });
+const __vite_ssr_import_0__ = await __vite_ssr_import__("/node_modules/.pnpm/undici@8.12.3/node_modules/undici/index.js", {"importedNames":["fetch"]});
+
+/** The fetch that must drive any `Agent` built from the `undici` package.
+*
+* Node's built-in fetch bundles its own undici, and the two diverge: undici 8
+* only accepts the current handler protocol (`onRequestStart`), so a request
+* from Node's fetch through a package `Agent` fails with "invalid
+* onRequestStart method" before a socket opens. Pairing the package's fetch
+* with its `Agent` keeps both on one version. Callers still inject a fetch
+* for tests and emulators.
+*
+* Global `FormData` fails this package's brand check and is sent as the string
+* "[object FormData]". Serialize it with the implementation that created it so
+* the multipart fields and Content-Type boundary stay paired. Other bodies are
+* passed through unchanged.
+*
+* The package `Response` fails `instanceof Response` against the global
+* constructor. Callers such as the MCP SDK then stringify the object
+* (`"[object Response]"`) instead of reading its status and body. Re-wrap the
+* payload in the global `Response` after the package fetch returns. The
+* request still uses this package's fetch and `Agent`, so host pinning is
+* unchanged. */
+const dispatcherFetch = (async (input, init) => {
+	const response = await (0,__vite_ssr_import_0__.fetch)(input, await initForPackageFetch(init));
+	return responseForGlobalRealm(response);
+});
+const HOP_BY_HOP_HEADERS = new Set([
+	"connection",
+	"keep-alive",
+	"proxy-connection",
+	"trailer",
+	"transfer-encoding",
+	"upgrade"
+]);
+const NULL_BODY_STATUSES = new Set([
+	204,
+	205,
+	304
+]);
+/** Copy a package `Response` into the global realm.
+*
+* Header iteration is a method call, so it works across the two `Headers`
+* classes. Hop-by-hop headers describe the socket undici already finished and
+* would mislabel the re-streamed body. The parameter is not typed as the
+* global `Response`: a failed `instanceof` check would otherwise narrow it
+* to `never`, which is the mismatch this function exists to repair. */
+function responseForGlobalRealm(input) {
+	if (input instanceof globalThis.Response) return input;
+	const response = input;
+	const headers = new Headers();
+	response.headers.forEach((value, key) => {
+		if (!HOP_BY_HOP_HEADERS.has(key.toLowerCase())) headers.append(key, value);
+	});
+	const init = {
+		status: response.status,
+		statusText: response.statusText,
+		headers
+	};
+	if (response.body == null || NULL_BODY_STATUSES.has(response.status)) {
+		return new Response(null, init);
+	};
+	const reader = response.body.getReader();
+	const body = new ReadableStream({
+		async pull(controller) {
+			try {
+				const next = await reader.read();
+				if (next.done) {
+					controller.close();
+					return;
+				};
+				controller.enqueue(next.value);
+			} catch (error) {
+				controller.error(error);
+			}
+		},
+		cancel(reason) {
+			return reader.cancel(reason);
+		}
+	});
+	return new Response(body, init);
+}
+/** Node's fetch as this module loaded it. A later replacement of
+* `globalThis.fetch` is a different function; the original is still paired
+* here so a captured builtin is not handed the package Agent. */
+const nodeFetch = globalThis.fetch;
+/** Package fetch for an `Agent` from this undici.
+*
+* A missing transport, the fetch currently installed as `globalThis.fetch`,
+* and a captured builtin all use `dispatcherFetch`. Any other function is
+* the caller's transport and is returned unchanged. */
+function fetchPairedWithDispatcher(baseFetch) {
+	if (baseFetch == null || baseFetch === nodeFetch || baseFetch === globalThis.fetch || baseFetch === dispatcherFetch) {
+		return dispatcherFetch;
+	};
+	return baseFetch;
+};
+/** Snapshot a global FormData body before this package's fetch sees it.
+*
+* The snapshot's Content-Type is the boundary embedded in the bytes. Set that
+* header only when the caller did not already supply one, matching fetch. */
+async function initForPackageFetch(init) {
+	if (!(init?.body instanceof FormData)) return init;
+	const encoded = new Request("https://example.com/", {
+		method: "POST",
+		body: init.body
+	});
+	const contentType = encoded.headers.get("content-type");
+	if (!contentType?.includes("boundary=")) {
+		throw new Error("FormData body did not include a multipart Content-Type.");
+	};
+	const headers = new Headers(init.headers);
+	if (!headers.has("content-type")) headers.set("content-type", contentType);
+	return {
+		...init,
+		body: new Uint8Array(await encoded.arrayBuffer()),
+		headers
+	};
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7QUFBQTs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OztBQXNCTyxNQUFNLG1CQUFtQixPQUFPLE9BQTBCLFNBQXVCO0NBQ3RGLE1BQU0sV0FBVyxNQUFNLGdDQUNyQixPQUNDLE1BQU0sb0JBQW9CLElBQUksQ0FDakM7Q0FDQSxPQUFPLHVCQUF1QixRQUFrQjtBQUNsRDtBQUVBLE1BQU0scUJBQXFCLElBQUksSUFBSTtDQUNqQztDQUNBO0NBQ0E7Q0FDQTtDQUNBO0NBQ0E7QUFDRixDQUFDO0FBRUQsTUFBTSxxQkFBcUIsSUFBSSxJQUFJO0NBQUM7Q0FBSztDQUFLO0FBQUcsQ0FBQzs7Ozs7Ozs7QUFnQmxELFNBQVMsdUJBQXVCLE9BQXlCO0NBQ3ZELElBQUksaUJBQWlCLFdBQVcsVUFBVSxPQUFPO0NBQ2pELE1BQU0sV0FBVztDQUNqQixNQUFNLFVBQVUsSUFBSSxRQUFRO0NBQzVCLFNBQVMsUUFBUSxTQUFTLE9BQU8sUUFBUTtFQUN2QyxJQUFJLENBQUMsbUJBQW1CLElBQUksSUFBSSxZQUFZLENBQUMsR0FBRyxRQUFRLE9BQU8sS0FBSyxLQUFLO0NBQzNFLENBQUM7Q0FDRCxNQUFNLE9BQU87RUFBRSxRQUFRLFNBQVM7RUFBUSxZQUFZLFNBQVM7RUFBWTtDQUFRO0NBQ2pGLElBQUksU0FBUyxRQUFRLFFBQVEsbUJBQW1CLElBQUksU0FBUyxNQUFNLEdBQUc7RUFDcEUsT0FBTyxJQUFJLFNBQVMsTUFBTSxJQUFJO0NBQ2hDO0NBQ0EsTUFBTSxTQUFTLFNBQVMsS0FBSyxVQUFVO0NBQ3ZDLE1BQU0sT0FBTyxJQUFJLGVBQTJCO0VBQzFDLE1BQU0sS0FBSyxZQUFZO0dBQ3JCLElBQUk7SUFDRixNQUFNLE9BQU8sTUFBTSxPQUFPLEtBQUs7SUFDL0IsSUFBSSxLQUFLLE1BQU07S0FDYixXQUFXLE1BQU07S0FDakI7SUFDRjtJQUNBLFdBQVcsUUFBUSxLQUFLLEtBQUs7R0FDL0IsU0FBUyxPQUFPO0lBQ2QsV0FBVyxNQUFNLEtBQUs7R0FDeEI7RUFDRjtFQUNBLE9BQU8sUUFBUTtHQUNiLE9BQU8sT0FBTyxPQUFPLE1BQU07RUFDN0I7Q0FDRixDQUFDO0NBQ0QsT0FBTyxJQUFJLFNBQVMsTUFBTSxJQUFJO0FBQ2hDOzs7O0FBS0EsTUFBTSxZQUFZLFdBQVc7Ozs7OztBQU90QixTQUFTLDBCQUNkLFdBQ3lCO0NBQ3pCLElBQ0UsYUFBYSxRQUNiLGNBQWMsYUFDZCxjQUFjLFdBQVcsU0FDekIsY0FBYyxpQkFDZDtFQUNBLE9BQU87Q0FDVDtDQUNBLE9BQU87QUFDVDs7Ozs7QUFNQSxlQUFlLG9CQUFvQixNQUFzRDtDQUN2RixJQUFJLEVBQUUsTUFBTSxnQkFBZ0IsV0FBVyxPQUFPO0NBQzlDLE1BQU0sVUFBVSxJQUFJLFFBQVEsd0JBQXdCO0VBQUUsUUFBUTtFQUFRLE1BQU0sS0FBSztDQUFLLENBQUM7Q0FDdkYsTUFBTSxjQUFjLFFBQVEsUUFBUSxJQUFJLGNBQWM7Q0FDdEQsSUFBSSxDQUFDLGFBQWEsU0FBUyxXQUFXLEdBQUc7RUFDdkMsTUFBTSxJQUFJLE1BQU0seURBQXlEO0NBQzNFO0NBQ0EsTUFBTSxVQUFVLElBQUksUUFBUSxLQUFLLE9BQU87Q0FDeEMsSUFBSSxDQUFDLFFBQVEsSUFBSSxjQUFjLEdBQUcsUUFBUSxJQUFJLGdCQUFnQixXQUFXO0NBQ3pFLE9BQU87RUFBRSxHQUFHO0VBQU0sTUFBTSxJQUFJLFdBQVcsTUFBTSxRQUFRLFlBQVksQ0FBQztFQUFHO0NBQVE7QUFDL0UiLCJuYW1lcyI6W10sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbInVuZGljaS1mZXRjaC50cyJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgeyBmZXRjaCBhcyB1bmRpY2lGZXRjaCB9IGZyb20gXCJ1bmRpY2lcIjtcblxuLyoqIFRoZSBmZXRjaCB0aGF0IG11c3QgZHJpdmUgYW55IGBBZ2VudGAgYnVpbHQgZnJvbSB0aGUgYHVuZGljaWAgcGFja2FnZS5cbiAqXG4gKiBOb2RlJ3MgYnVpbHQtaW4gZmV0Y2ggYnVuZGxlcyBpdHMgb3duIHVuZGljaSwgYW5kIHRoZSB0d28gZGl2ZXJnZTogdW5kaWNpIDhcbiAqIG9ubHkgYWNjZXB0cyB0aGUgY3VycmVudCBoYW5kbGVyIHByb3RvY29sIChgb25SZXF1ZXN0U3RhcnRgKSwgc28gYSByZXF1ZXN0XG4gKiBmcm9tIE5vZGUncyBmZXRjaCB0aHJvdWdoIGEgcGFja2FnZSBgQWdlbnRgIGZhaWxzIHdpdGggXCJpbnZhbGlkXG4gKiBvblJlcXVlc3RTdGFydCBtZXRob2RcIiBiZWZvcmUgYSBzb2NrZXQgb3BlbnMuIFBhaXJpbmcgdGhlIHBhY2thZ2UncyBmZXRjaFxuICogd2l0aCBpdHMgYEFnZW50YCBrZWVwcyBib3RoIG9uIG9uZSB2ZXJzaW9uLiBDYWxsZXJzIHN0aWxsIGluamVjdCBhIGZldGNoXG4gKiBmb3IgdGVzdHMgYW5kIGVtdWxhdG9ycy5cbiAqXG4gKiBHbG9iYWwgYEZvcm1EYXRhYCBmYWlscyB0aGlzIHBhY2thZ2UncyBicmFuZCBjaGVjayBhbmQgaXMgc2VudCBhcyB0aGUgc3RyaW5nXG4gKiBcIltvYmplY3QgRm9ybURhdGFdXCIuIFNlcmlhbGl6ZSBpdCB3aXRoIHRoZSBpbXBsZW1lbnRhdGlvbiB0aGF0IGNyZWF0ZWQgaXQgc29cbiAqIHRoZSBtdWx0aXBhcnQgZmllbGRzIGFuZCBDb250ZW50LVR5cGUgYm91bmRhcnkgc3RheSBwYWlyZWQuIE90aGVyIGJvZGllcyBhcmVcbiAqIHBhc3NlZCB0aHJvdWdoIHVuY2hhbmdlZC5cbiAqXG4gKiBUaGUgcGFja2FnZSBgUmVzcG9uc2VgIGZhaWxzIGBpbnN0YW5jZW9mIFJlc3BvbnNlYCBhZ2FpbnN0IHRoZSBnbG9iYWxcbiAqIGNvbnN0cnVjdG9yLiBDYWxsZXJzIHN1Y2ggYXMgdGhlIE1DUCBTREsgdGhlbiBzdHJpbmdpZnkgdGhlIG9iamVjdFxuICogKGBcIltvYmplY3QgUmVzcG9uc2VdXCJgKSBpbnN0ZWFkIG9mIHJlYWRpbmcgaXRzIHN0YXR1cyBhbmQgYm9keS4gUmUtd3JhcCB0aGVcbiAqIHBheWxvYWQgaW4gdGhlIGdsb2JhbCBgUmVzcG9uc2VgIGFmdGVyIHRoZSBwYWNrYWdlIGZldGNoIHJldHVybnMuIFRoZVxuICogcmVxdWVzdCBzdGlsbCB1c2VzIHRoaXMgcGFja2FnZSdzIGZldGNoIGFuZCBgQWdlbnRgLCBzbyBob3N0IHBpbm5pbmcgaXNcbiAqIHVuY2hhbmdlZC4gKi9cbmV4cG9ydCBjb25zdCBkaXNwYXRjaGVyRmV0Y2ggPSAoYXN5bmMgKGlucHV0OiBSZXF1ZXN0SW5mbyB8IFVSTCwgaW5pdD86IFJlcXVlc3RJbml0KSA9PiB7XG4gIGNvbnN0IHJlc3BvbnNlID0gYXdhaXQgdW5kaWNpRmV0Y2goXG4gICAgaW5wdXQgYXMgUGFyYW1ldGVyczx0eXBlb2YgdW5kaWNpRmV0Y2g+WzBdLFxuICAgIChhd2FpdCBpbml0Rm9yUGFja2FnZUZldGNoKGluaXQpKSBhcyBQYXJhbWV0ZXJzPHR5cGVvZiB1bmRpY2lGZXRjaD5bMV0sXG4gICk7XG4gIHJldHVybiByZXNwb25zZUZvckdsb2JhbFJlYWxtKHJlc3BvbnNlIGFzIG9iamVjdCk7XG59KSBhcyB1bmtub3duIGFzIHR5cGVvZiBnbG9iYWxUaGlzLmZldGNoO1xuXG5jb25zdCBIT1BfQllfSE9QX0hFQURFUlMgPSBuZXcgU2V0KFtcbiAgXCJjb25uZWN0aW9uXCIsXG4gIFwia2VlcC1hbGl2ZVwiLFxuICBcInByb3h5LWNvbm5lY3Rpb25cIixcbiAgXCJ0cmFpbGVyXCIsXG4gIFwidHJhbnNmZXItZW5jb2RpbmdcIixcbiAgXCJ1cGdyYWRlXCIsXG5dKTtcblxuY29uc3QgTlVMTF9CT0RZX1NUQVRVU0VTID0gbmV3IFNldChbMjA0LCAyMDUsIDMwNF0pO1xuXG50eXBlIFBhY2thZ2VSZXNwb25zZSA9IHtcbiAgc3RhdHVzOiBudW1iZXI7XG4gIHN0YXR1c1RleHQ6IHN0cmluZztcbiAgaGVhZGVyczogeyBmb3JFYWNoKGNhbGxiYWNrOiAodmFsdWU6IHN0cmluZywga2V5OiBzdHJpbmcpID0+IHZvaWQpOiB2b2lkIH07XG4gIGJvZHk6IFJlYWRhYmxlU3RyZWFtPFVpbnQ4QXJyYXk+IHwgbnVsbDtcbn07XG5cbi8qKiBDb3B5IGEgcGFja2FnZSBgUmVzcG9uc2VgIGludG8gdGhlIGdsb2JhbCByZWFsbS5cbiAqXG4gKiBIZWFkZXIgaXRlcmF0aW9uIGlzIGEgbWV0aG9kIGNhbGwsIHNvIGl0IHdvcmtzIGFjcm9zcyB0aGUgdHdvIGBIZWFkZXJzYFxuICogY2xhc3Nlcy4gSG9wLWJ5LWhvcCBoZWFkZXJzIGRlc2NyaWJlIHRoZSBzb2NrZXQgdW5kaWNpIGFscmVhZHkgZmluaXNoZWQgYW5kXG4gKiB3b3VsZCBtaXNsYWJlbCB0aGUgcmUtc3RyZWFtZWQgYm9keS4gVGhlIHBhcmFtZXRlciBpcyBub3QgdHlwZWQgYXMgdGhlXG4gKiBnbG9iYWwgYFJlc3BvbnNlYDogYSBmYWlsZWQgYGluc3RhbmNlb2ZgIGNoZWNrIHdvdWxkIG90aGVyd2lzZSBuYXJyb3cgaXRcbiAqIHRvIGBuZXZlcmAsIHdoaWNoIGlzIHRoZSBtaXNtYXRjaCB0aGlzIGZ1bmN0aW9uIGV4aXN0cyB0byByZXBhaXIuICovXG5mdW5jdGlvbiByZXNwb25zZUZvckdsb2JhbFJlYWxtKGlucHV0OiBvYmplY3QpOiBSZXNwb25zZSB7XG4gIGlmIChpbnB1dCBpbnN0YW5jZW9mIGdsb2JhbFRoaXMuUmVzcG9uc2UpIHJldHVybiBpbnB1dDtcbiAgY29uc3QgcmVzcG9uc2UgPSBpbnB1dCBhcyBQYWNrYWdlUmVzcG9uc2U7XG4gIGNvbnN0IGhlYWRlcnMgPSBuZXcgSGVhZGVycygpO1xuICByZXNwb25zZS5oZWFkZXJzLmZvckVhY2goKHZhbHVlLCBrZXkpID0+IHtcbiAgICBpZiAoIUhPUF9CWV9IT1BfSEVBREVSUy5oYXMoa2V5LnRvTG93ZXJDYXNlKCkpKSBoZWFkZXJzLmFwcGVuZChrZXksIHZhbHVlKTtcbiAgfSk7XG4gIGNvbnN0IGluaXQgPSB7IHN0YXR1czogcmVzcG9uc2Uuc3RhdHVzLCBzdGF0dXNUZXh0OiByZXNwb25zZS5zdGF0dXNUZXh0LCBoZWFkZXJzIH07XG4gIGlmIChyZXNwb25zZS5ib2R5ID09IG51bGwgfHwgTlVMTF9CT0RZX1NUQVRVU0VTLmhhcyhyZXNwb25zZS5zdGF0dXMpKSB7XG4gICAgcmV0dXJuIG5ldyBSZXNwb25zZShudWxsLCBpbml0KTtcbiAgfVxuICBjb25zdCByZWFkZXIgPSByZXNwb25zZS5ib2R5LmdldFJlYWRlcigpO1xuICBjb25zdCBib2R5ID0gbmV3IFJlYWRhYmxlU3RyZWFtPFVpbnQ4QXJyYXk+KHtcbiAgICBhc3luYyBwdWxsKGNvbnRyb2xsZXIpIHtcbiAgICAgIHRyeSB7XG4gICAgICAgIGNvbnN0IG5leHQgPSBhd2FpdCByZWFkZXIucmVhZCgpO1xuICAgICAgICBpZiAobmV4dC5kb25lKSB7XG4gICAgICAgICAgY29udHJvbGxlci5jbG9zZSgpO1xuICAgICAgICAgIHJldHVybjtcbiAgICAgICAgfVxuICAgICAgICBjb250cm9sbGVyLmVucXVldWUobmV4dC52YWx1ZSk7XG4gICAgICB9IGNhdGNoIChlcnJvcikge1xuICAgICAgICBjb250cm9sbGVyLmVycm9yKGVycm9yKTtcbiAgICAgIH1cbiAgICB9LFxuICAgIGNhbmNlbChyZWFzb24pIHtcbiAgICAgIHJldHVybiByZWFkZXIuY2FuY2VsKHJlYXNvbik7XG4gICAgfSxcbiAgfSk7XG4gIHJldHVybiBuZXcgUmVzcG9uc2UoYm9keSwgaW5pdCk7XG59XG5cbi8qKiBOb2RlJ3MgZmV0Y2ggYXMgdGhpcyBtb2R1bGUgbG9hZGVkIGl0LiBBIGxhdGVyIHJlcGxhY2VtZW50IG9mXG4gKiBgZ2xvYmFsVGhpcy5mZXRjaGAgaXMgYSBkaWZmZXJlbnQgZnVuY3Rpb247IHRoZSBvcmlnaW5hbCBpcyBzdGlsbCBwYWlyZWRcbiAqIGhlcmUgc28gYSBjYXB0dXJlZCBidWlsdGluIGlzIG5vdCBoYW5kZWQgdGhlIHBhY2thZ2UgQWdlbnQuICovXG5jb25zdCBub2RlRmV0Y2ggPSBnbG9iYWxUaGlzLmZldGNoO1xuXG4vKiogUGFja2FnZSBmZXRjaCBmb3IgYW4gYEFnZW50YCBmcm9tIHRoaXMgdW5kaWNpLlxuICpcbiAqIEEgbWlzc2luZyB0cmFuc3BvcnQsIHRoZSBmZXRjaCBjdXJyZW50bHkgaW5zdGFsbGVkIGFzIGBnbG9iYWxUaGlzLmZldGNoYCxcbiAqIGFuZCBhIGNhcHR1cmVkIGJ1aWx0aW4gYWxsIHVzZSBgZGlzcGF0Y2hlckZldGNoYC4gQW55IG90aGVyIGZ1bmN0aW9uIGlzXG4gKiB0aGUgY2FsbGVyJ3MgdHJhbnNwb3J0IGFuZCBpcyByZXR1cm5lZCB1bmNoYW5nZWQuICovXG5leHBvcnQgZnVuY3Rpb24gZmV0Y2hQYWlyZWRXaXRoRGlzcGF0Y2hlcihcbiAgYmFzZUZldGNoPzogdHlwZW9mIGdsb2JhbFRoaXMuZmV0Y2gsXG4pOiB0eXBlb2YgZ2xvYmFsVGhpcy5mZXRjaCB7XG4gIGlmIChcbiAgICBiYXNlRmV0Y2ggPT0gbnVsbCB8fFxuICAgIGJhc2VGZXRjaCA9PT0gbm9kZUZldGNoIHx8XG4gICAgYmFzZUZldGNoID09PSBnbG9iYWxUaGlzLmZldGNoIHx8XG4gICAgYmFzZUZldGNoID09PSBkaXNwYXRjaGVyRmV0Y2hcbiAgKSB7XG4gICAgcmV0dXJuIGRpc3BhdGNoZXJGZXRjaDtcbiAgfVxuICByZXR1cm4gYmFzZUZldGNoO1xufVxuXG4vKiogU25hcHNob3QgYSBnbG9iYWwgRm9ybURhdGEgYm9keSBiZWZvcmUgdGhpcyBwYWNrYWdlJ3MgZmV0Y2ggc2VlcyBpdC5cbiAqXG4gKiBUaGUgc25hcHNob3QncyBDb250ZW50LVR5cGUgaXMgdGhlIGJvdW5kYXJ5IGVtYmVkZGVkIGluIHRoZSBieXRlcy4gU2V0IHRoYXRcbiAqIGhlYWRlciBvbmx5IHdoZW4gdGhlIGNhbGxlciBkaWQgbm90IGFscmVhZHkgc3VwcGx5IG9uZSwgbWF0Y2hpbmcgZmV0Y2guICovXG5hc3luYyBmdW5jdGlvbiBpbml0Rm9yUGFja2FnZUZldGNoKGluaXQ/OiBSZXF1ZXN0SW5pdCk6IFByb21pc2U8UmVxdWVzdEluaXQgfCB1bmRlZmluZWQ+IHtcbiAgaWYgKCEoaW5pdD8uYm9keSBpbnN0YW5jZW9mIEZvcm1EYXRhKSkgcmV0dXJuIGluaXQ7XG4gIGNvbnN0IGVuY29kZWQgPSBuZXcgUmVxdWVzdChcImh0dHBzOi8vZXhhbXBsZS5jb20vXCIsIHsgbWV0aG9kOiBcIlBPU1RcIiwgYm9keTogaW5pdC5ib2R5IH0pO1xuICBjb25zdCBjb250ZW50VHlwZSA9IGVuY29kZWQuaGVhZGVycy5nZXQoXCJjb250ZW50LXR5cGVcIik7XG4gIGlmICghY29udGVudFR5cGU/LmluY2x1ZGVzKFwiYm91bmRhcnk9XCIpKSB7XG4gICAgdGhyb3cgbmV3IEVycm9yKFwiRm9ybURhdGEgYm9keSBkaWQgbm90IGluY2x1ZGUgYSBtdWx0aXBhcnQgQ29udGVudC1UeXBlLlwiKTtcbiAgfVxuICBjb25zdCBoZWFkZXJzID0gbmV3IEhlYWRlcnMoaW5pdC5oZWFkZXJzKTtcbiAgaWYgKCFoZWFkZXJzLmhhcyhcImNvbnRlbnQtdHlwZVwiKSkgaGVhZGVycy5zZXQoXCJjb250ZW50LXR5cGVcIiwgY29udGVudFR5cGUpO1xuICByZXR1cm4geyAuLi5pbml0LCBib2R5OiBuZXcgVWludDhBcnJheShhd2FpdCBlbmNvZGVkLmFycmF5QnVmZmVyKCkpLCBoZWFkZXJzIH07XG59XG4iXSwiZmlsZSI6Ii9wYWNrYWdlcy9hZGFwdGVycy9zcmMvdW5kaWNpLWZldGNoLnRzIn0=
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvYWRhcHRlcnMvc3JjL3VuZGljaS1mZXRjaC50cyIsIi9wYWNrYWdlcy9hZGFwdGVycy9zcmMvdW5kaWNpLWZldGNoLnRzIixbXV0=

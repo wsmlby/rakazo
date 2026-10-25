@@ -32,6 +32,7 @@ import type { RefObject } from "react";
 import { useId, useRef, useState, useSyncExternalStore } from "react";
 import { AccountAccess } from "../components/AccountAccess";
 import { SuccessPop } from "../components/ai/primitives";
+import { CompanyInvitations } from "../components/CompanyInvitations";
 import { ComputersUnavailableHint } from "../components/ComputersUnavailableHint";
 import { DesktopUpdateSection } from "../components/DesktopUpdates";
 import { PasskeySettings } from "../components/PasskeySettings";
@@ -291,6 +292,8 @@ export function GeneralSettingsPanels({
           />
         ) : null}
       </SettingsGroup>
+
+      <CompanyInvitations />
 
       <SettingsGroup title={<Trans>Preferences</Trans>}>
         <SettingsRow

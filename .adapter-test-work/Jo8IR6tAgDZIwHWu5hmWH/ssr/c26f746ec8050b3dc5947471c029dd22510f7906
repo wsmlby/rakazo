@@ -1,0 +1,9 @@
+__vite_ssr_exportName__("isVitestRuntime", () => { try { return isVitestRuntime } catch {} });
+/** Vitest sets VITEST=true; false-like deployment values must not disable live adapters. */
+function isVitestRuntime(value = process.env.VITEST) {
+	return value === "true" || value === "1";
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7QUFDTyxTQUFTLGdCQUFnQixRQUE0QixRQUFRLElBQUksUUFBaUI7Q0FDdkYsT0FBTyxVQUFVLFVBQVUsVUFBVTtBQUN2QyIsIm5hbWVzIjpbXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZXMiOlsidGVzdC1ydW50aW1lLnRzIl0sInNvdXJjZXNDb250ZW50IjpbIi8qKiBWaXRlc3Qgc2V0cyBWSVRFU1Q9dHJ1ZTsgZmFsc2UtbGlrZSBkZXBsb3ltZW50IHZhbHVlcyBtdXN0IG5vdCBkaXNhYmxlIGxpdmUgYWRhcHRlcnMuICovXG5leHBvcnQgZnVuY3Rpb24gaXNWaXRlc3RSdW50aW1lKHZhbHVlOiBzdHJpbmcgfCB1bmRlZmluZWQgPSBwcm9jZXNzLmVudi5WSVRFU1QpOiBib29sZWFuIHtcbiAgcmV0dXJuIHZhbHVlID09PSBcInRydWVcIiB8fCB2YWx1ZSA9PT0gXCIxXCI7XG59XG4iXSwiZmlsZSI6Ii9wYWNrYWdlcy9hZGFwdGVycy9zcmMvdGVzdC1ydW50aW1lLnRzIn0=
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvYWRhcHRlcnMvc3JjL3Rlc3QtcnVudGltZS50cyIsIi9wYWNrYWdlcy9hZGFwdGVycy9zcmMvdGVzdC1ydW50aW1lLnRzIixbXV0=

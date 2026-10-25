@@ -1,0 +1,65 @@
+__vite_ssr_exportName__("DEFAULT_OPENROUTER_MODEL_ID", () => { try { return DEFAULT_OPENROUTER_MODEL_ID } catch {} });
+__vite_ssr_exportName__("hostCredentialSource", () => { try { return hostCredentialSource } catch {} });
+__vite_ssr_exportName__("resolveDeploymentModel", () => { try { return resolveDeploymentModel } catch {} });
+__vite_ssr_exportName__("deploymentModelUsageLookup", () => { try { return deploymentModelUsageLookup } catch {} });
+const __vite_ssr_import_0__ = await __vite_ssr_import__("/node_modules/.pnpm/@earendil-works+pi-ai@1.3.0_@aws-sdk+credential-provider-node@3.972.82_@modelcontextprotocol+_t45x5ihtmnlwfrl4cviycv7iqi/node_modules/@earendil-works/pi-ai/dist/compat.js", {"importedNames":["getEnvApiKey"]});
+const __vite_ssr_import_1__ = await __vite_ssr_import__("/packages/adapters/src/openrouter-usage.ts", {"importedNames":["OpenRouterUsageLookup"]});
+
+
+const DEFAULT_OPENROUTER_MODEL_ID = "openai/gpt-6-luna";
+/**
+* What Pi reports for a provider that authenticates from the host instead of a key: an AWS
+* profile or task role for Amazon Bedrock, Application Default Credentials for Vertex.
+*/
+const HOST_CREDENTIALS = "<authenticated>";
+/** What a provider's host credentials are, for telling a user what a deployment runs on. */
+const HOST_CREDENTIAL_SOURCES = {
+	"amazon-bedrock": "AWS IAM",
+	"google-vertex": "Google Cloud"
+};
+/** The kind of host credentials a provider authenticates with, e.g. "AWS IAM". */
+function hostCredentialSource(provider) {
+	return HOST_CREDENTIAL_SOURCES[provider] ?? "host";
+};
+/**
+* The deployment-wide model default: which provider a run falls back to when no user
+* credential applies, and the key for that provider.
+*
+* Keyless host authentication requires explicit opt-in and a model id. Bedrock resolves
+* its credential chain (including instance roles) at request time; other providers must
+* report host credentials in the process environment. Host credentials never become `key`.
+*
+* Vendor env names and model ids live here, in the adapter layer, not in core.
+*/
+function resolveDeploymentModel(env = process.env) {
+	const provider = env.PI_DEFAULT_PROVIDER?.trim() || "openrouter";
+	// A row per provider that ships a deployment key. A third one adds a row here, not a
+	// branch at each call site — and an unknown provider gets no key rather than another
+	// vendor's, which a ternary on one provider would not give.
+	const keys = {
+		openrouter: env.OPENROUTER_API_KEY,
+		anthropic: env.ANTHROPIC_API_KEY
+	};
+	const models = {
+		openrouter: DEFAULT_OPENROUTER_MODEL_ID,
+		anthropic: "claude-sonnet-5"
+	};
+	const explicitModel = env.PI_DEFAULT_MODEL?.trim();
+	const key = keys[provider];
+	const hostCredentials = !key && Boolean(explicitModel) && env.PI_DEFAULT_CREDENTIALS?.trim() === "host" && (provider === "amazon-bedrock" || (0,__vite_ssr_import_0__.getEnvApiKey)(provider) === HOST_CREDENTIALS);
+	return {
+		provider,
+		model: explicitModel || models[provider] || models.openrouter,
+		key,
+		configured: Boolean(key) || hostCredentials,
+		hostCredentials
+	};
+};
+function deploymentModelUsageLookup() {
+	const model = resolveDeploymentModel();
+	return model.provider === "openrouter" && model.key ? new __vite_ssr_import_1__.OpenRouterUsageLookup(model.key) : undefined;
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7OztBQUFBO0FBRUE7OztBQUVPLE1BQU0sOEJBQThCOzs7OztBQU0zQyxNQUFNLG1CQUFtQjs7QUFHekIsTUFBTSwwQkFBa0Q7Q0FDdEQsa0JBQWtCO0NBQ2xCLGlCQUFpQjtBQUNuQjs7QUFHTyxTQUFTLHFCQUFxQixVQUEwQjtDQUM3RCxPQUFPLHdCQUF3QixhQUFhO0FBQzlDOzs7Ozs7Ozs7OztBQVlPLFNBQVMsdUJBQXVCLE1BQXlCLFFBQVEsS0FBSztDQUMzRSxNQUFNLFdBQVcsSUFBSSxxQkFBcUIsS0FBSyxLQUFLOzs7O0NBSXBELE1BQU0sT0FBMkM7RUFDL0MsWUFBWSxJQUFJO0VBQ2hCLFdBQVcsSUFBSTtDQUNqQjtDQUNBLE1BQU0sU0FBaUM7RUFDckMsWUFBWTtFQUNaLFdBQVc7Q0FDYjtDQUNBLE1BQU0sZ0JBQWdCLElBQUksa0JBQWtCLEtBQUs7Q0FDakQsTUFBTSxNQUFNLEtBQUs7Q0FDakIsTUFBTSxrQkFDSixDQUFDLE9BQ0QsUUFBUSxhQUFhLEtBQ3JCLElBQUksd0JBQXdCLEtBQUssTUFBTSxXQUV0QyxhQUFhLG9CQUFvQix1Q0FBYSxRQUFRLE1BQU07Q0FDL0QsT0FBTztFQUNMO0VBQ0EsT0FBTyxpQkFBaUIsT0FBTyxhQUFhLE9BQU87RUFDbkQ7RUFDQSxZQUFZLFFBQVEsR0FBRyxLQUFLO0VBQzVCO0NBQ0Y7QUFDRjtBQUVPLFNBQVMsNkJBQTJEO0NBQ3pFLE1BQU0sUUFBUSx1QkFBdUI7Q0FDckMsT0FBTyxNQUFNLGFBQWEsZ0JBQWdCLE1BQU0sTUFDNUMsSUFBSSw0Q0FBc0IsTUFBTSxHQUFHLElBQ25DO0FBQ04iLCJuYW1lcyI6W10sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbImRlcGxveW1lbnQtbW9kZWwudHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHsgZ2V0RW52QXBpS2V5IH0gZnJvbSBcIkBlYXJlbmRpbC13b3Jrcy9waS1haS9jb21wYXRcIjtcbmltcG9ydCB0eXBlIHsgTW9kZWxVc2FnZUxvb2t1cCB9IGZyb20gXCJAcmFrYXpvL2FkYXB0ZXIta2l0XCI7XG5pbXBvcnQgeyBPcGVuUm91dGVyVXNhZ2VMb29rdXAgfSBmcm9tIFwiLi9vcGVucm91dGVyLXVzYWdlLmpzXCI7XG5cbmV4cG9ydCBjb25zdCBERUZBVUxUX09QRU5ST1VURVJfTU9ERUxfSUQgPSBcIm9wZW5haS9ncHQtNi1sdW5hXCI7XG5cbi8qKlxuICogV2hhdCBQaSByZXBvcnRzIGZvciBhIHByb3ZpZGVyIHRoYXQgYXV0aGVudGljYXRlcyBmcm9tIHRoZSBob3N0IGluc3RlYWQgb2YgYSBrZXk6IGFuIEFXU1xuICogcHJvZmlsZSBvciB0YXNrIHJvbGUgZm9yIEFtYXpvbiBCZWRyb2NrLCBBcHBsaWNhdGlvbiBEZWZhdWx0IENyZWRlbnRpYWxzIGZvciBWZXJ0ZXguXG4gKi9cbmNvbnN0IEhPU1RfQ1JFREVOVElBTFMgPSBcIjxhdXRoZW50aWNhdGVkPlwiO1xuXG4vKiogV2hhdCBhIHByb3ZpZGVyJ3MgaG9zdCBjcmVkZW50aWFscyBhcmUsIGZvciB0ZWxsaW5nIGEgdXNlciB3aGF0IGEgZGVwbG95bWVudCBydW5zIG9uLiAqL1xuY29uc3QgSE9TVF9DUkVERU5USUFMX1NPVVJDRVM6IFJlY29yZDxzdHJpbmcsIHN0cmluZz4gPSB7XG4gIFwiYW1hem9uLWJlZHJvY2tcIjogXCJBV1MgSUFNXCIsXG4gIFwiZ29vZ2xlLXZlcnRleFwiOiBcIkdvb2dsZSBDbG91ZFwiLFxufTtcblxuLyoqIFRoZSBraW5kIG9mIGhvc3QgY3JlZGVudGlhbHMgYSBwcm92aWRlciBhdXRoZW50aWNhdGVzIHdpdGgsIGUuZy4gXCJBV1MgSUFNXCIuICovXG5leHBvcnQgZnVuY3Rpb24gaG9zdENyZWRlbnRpYWxTb3VyY2UocHJvdmlkZXI6IHN0cmluZyk6IHN0cmluZyB7XG4gIHJldHVybiBIT1NUX0NSRURFTlRJQUxfU09VUkNFU1twcm92aWRlcl0gPz8gXCJob3N0XCI7XG59XG5cbi8qKlxuICogVGhlIGRlcGxveW1lbnQtd2lkZSBtb2RlbCBkZWZhdWx0OiB3aGljaCBwcm92aWRlciBhIHJ1biBmYWxscyBiYWNrIHRvIHdoZW4gbm8gdXNlclxuICogY3JlZGVudGlhbCBhcHBsaWVzLCBhbmQgdGhlIGtleSBmb3IgdGhhdCBwcm92aWRlci5cbiAqXG4gKiBLZXlsZXNzIGhvc3QgYXV0aGVudGljYXRpb24gcmVxdWlyZXMgZXhwbGljaXQgb3B0LWluIGFuZCBhIG1vZGVsIGlkLiBCZWRyb2NrIHJlc29sdmVzXG4gKiBpdHMgY3JlZGVudGlhbCBjaGFpbiAoaW5jbHVkaW5nIGluc3RhbmNlIHJvbGVzKSBhdCByZXF1ZXN0IHRpbWU7IG90aGVyIHByb3ZpZGVycyBtdXN0XG4gKiByZXBvcnQgaG9zdCBjcmVkZW50aWFscyBpbiB0aGUgcHJvY2VzcyBlbnZpcm9ubWVudC4gSG9zdCBjcmVkZW50aWFscyBuZXZlciBiZWNvbWUgYGtleWAuXG4gKlxuICogVmVuZG9yIGVudiBuYW1lcyBhbmQgbW9kZWwgaWRzIGxpdmUgaGVyZSwgaW4gdGhlIGFkYXB0ZXIgbGF5ZXIsIG5vdCBpbiBjb3JlLlxuICovXG5leHBvcnQgZnVuY3Rpb24gcmVzb2x2ZURlcGxveW1lbnRNb2RlbChlbnY6IE5vZGVKUy5Qcm9jZXNzRW52ID0gcHJvY2Vzcy5lbnYpIHtcbiAgY29uc3QgcHJvdmlkZXIgPSBlbnYuUElfREVGQVVMVF9QUk9WSURFUj8udHJpbSgpIHx8IFwib3BlbnJvdXRlclwiO1xuICAvLyBBIHJvdyBwZXIgcHJvdmlkZXIgdGhhdCBzaGlwcyBhIGRlcGxveW1lbnQga2V5LiBBIHRoaXJkIG9uZSBhZGRzIGEgcm93IGhlcmUsIG5vdCBhXG4gIC8vIGJyYW5jaCBhdCBlYWNoIGNhbGwgc2l0ZSDigJQgYW5kIGFuIHVua25vd24gcHJvdmlkZXIgZ2V0cyBubyBrZXkgcmF0aGVyIHRoYW4gYW5vdGhlclxuICAvLyB2ZW5kb3Incywgd2hpY2ggYSB0ZXJuYXJ5IG9uIG9uZSBwcm92aWRlciB3b3VsZCBub3QgZ2l2ZS5cbiAgY29uc3Qga2V5czogUmVjb3JkPHN0cmluZywgc3RyaW5nIHwgdW5kZWZpbmVkPiA9IHtcbiAgICBvcGVucm91dGVyOiBlbnYuT1BFTlJPVVRFUl9BUElfS0VZLFxuICAgIGFudGhyb3BpYzogZW52LkFOVEhST1BJQ19BUElfS0VZLFxuICB9O1xuICBjb25zdCBtb2RlbHM6IFJlY29yZDxzdHJpbmcsIHN0cmluZz4gPSB7XG4gICAgb3BlbnJvdXRlcjogREVGQVVMVF9PUEVOUk9VVEVSX01PREVMX0lELFxuICAgIGFudGhyb3BpYzogXCJjbGF1ZGUtc29ubmV0LTVcIixcbiAgfTtcbiAgY29uc3QgZXhwbGljaXRNb2RlbCA9IGVudi5QSV9ERUZBVUxUX01PREVMPy50cmltKCk7XG4gIGNvbnN0IGtleSA9IGtleXNbcHJvdmlkZXJdO1xuICBjb25zdCBob3N0Q3JlZGVudGlhbHMgPVxuICAgICFrZXkgJiZcbiAgICBCb29sZWFuKGV4cGxpY2l0TW9kZWwpICYmXG4gICAgZW52LlBJX0RFRkFVTFRfQ1JFREVOVElBTFM/LnRyaW0oKSA9PT0gXCJob3N0XCIgJiZcbiAgICAvLyBCZWRyb2NrIGFsc28gcmVzb2x2ZXMgRUMyIGluc3RhbmNlIHJvbGVzIHRocm91Z2ggSU1EUyBhdCByZXF1ZXN0IHRpbWUuXG4gICAgKHByb3ZpZGVyID09PSBcImFtYXpvbi1iZWRyb2NrXCIgfHwgZ2V0RW52QXBpS2V5KHByb3ZpZGVyKSA9PT0gSE9TVF9DUkVERU5USUFMUyk7XG4gIHJldHVybiB7XG4gICAgcHJvdmlkZXIsXG4gICAgbW9kZWw6IGV4cGxpY2l0TW9kZWwgfHwgbW9kZWxzW3Byb3ZpZGVyXSB8fCBtb2RlbHMub3BlbnJvdXRlciEsXG4gICAga2V5LFxuICAgIGNvbmZpZ3VyZWQ6IEJvb2xlYW4oa2V5KSB8fCBob3N0Q3JlZGVudGlhbHMsXG4gICAgaG9zdENyZWRlbnRpYWxzLFxuICB9O1xufVxuXG5leHBvcnQgZnVuY3Rpb24gZGVwbG95bWVudE1vZGVsVXNhZ2VMb29rdXAoKTogTW9kZWxVc2FnZUxvb2t1cCB8IHVuZGVmaW5lZCB7XG4gIGNvbnN0IG1vZGVsID0gcmVzb2x2ZURlcGxveW1lbnRNb2RlbCgpO1xuICByZXR1cm4gbW9kZWwucHJvdmlkZXIgPT09IFwib3BlbnJvdXRlclwiICYmIG1vZGVsLmtleVxuICAgID8gbmV3IE9wZW5Sb3V0ZXJVc2FnZUxvb2t1cChtb2RlbC5rZXkpXG4gICAgOiB1bmRlZmluZWQ7XG59XG4iXSwiZmlsZSI6Ii9wYWNrYWdlcy9hZGFwdGVycy9zcmMvZGVwbG95bWVudC1tb2RlbC50cyJ9
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvYWRhcHRlcnMvc3JjL2RlcGxveW1lbnQtbW9kZWwudHMiLCIvcGFja2FnZXMvYWRhcHRlcnMvc3JjL2RlcGxveW1lbnQtbW9kZWwudHMiLFtdXQ==

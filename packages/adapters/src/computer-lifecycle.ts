@@ -165,7 +165,36 @@ export async function provisionComputer(
 ): Promise<ComputerRef> {
   const started = performance.now();
   const log = getLogger().child({ "computer.id": computerId, "run.id": context.runId });
-  let existing = await deps.prisma.computer.findUniqueOrThrow({ where: { id: computerId } });
+  const botAccess = context.collaborationRestricted
+    ? {
+        userId: context.userId,
+        spaceId: context.spaceId,
+        scope: "dedicated",
+        kind: { not: "desktop" },
+        bots: {
+          some: {
+            id: context.botId ?? "",
+            userId: context.userId,
+            spaceId: context.spaceId,
+            archivedAt: null,
+          },
+          none: { id: { not: context.botId ?? "" } },
+        },
+      }
+    : context.botId
+      ? { bots: { some: { id: context.botId, archivedAt: null } } }
+      : {};
+  if (
+    context.collaborationRestricted &&
+    (!context.botId ||
+      (await deps.sandbox.provisionKind?.()) === "desktop")
+  )
+    throw new Error("Shared bot computer access is no longer valid.");
+  const initial = context.collaborationRestricted
+    ? await deps.prisma.computer.findFirst({ where: { id: computerId, ...botAccess } })
+    : await deps.prisma.computer.findUniqueOrThrow({ where: { id: computerId } });
+  if (!initial) throw new Error("Shared bot computer access is no longer valid.");
+  let existing = initial;
   if (existing.maintenanceId && existing.maintenanceId !== context.operationId)
     throw new ComputerBusyError();
   if (existing.controlLeaseId && !hasActiveComputerControl(existing)) {
@@ -186,13 +215,13 @@ export async function provisionComputer(
       context.signal.throwIfAborted();
       const retained = await deps.prisma.computer.updateMany({
         where: {
+          ...botAccess,
           id: computerId,
           state: "running",
           providerRef: existing.providerRef,
           kind: existing.kind,
           screenGeneration: existing.screenGeneration,
           maintenanceId: existing.maintenanceId ?? null,
-          ...(context.botId ? { bots: { some: { id: context.botId, archivedAt: null } } } : {}),
         },
         // A row activated by an older release has no clock yet; start it now.
         data: {
@@ -318,10 +347,10 @@ export async function provisionComputer(
   const claimStamp = new Date(Math.max(Date.now(), observedStamp.getTime() + 1));
   const claimed = await deps.prisma.computer.updateMany({
     where: {
+      ...botAccess,
       id: computerId,
       ...claimWhere,
       maintenanceId: existing.maintenanceId ?? null,
-      ...(context.botId ? { bots: { some: { id: context.botId, archivedAt: null } } } : {}),
     },
     data: { state: "booting", updatedAt: claimStamp },
   });
@@ -351,6 +380,8 @@ export async function provisionComputer(
         ),
     );
     provisioned = ref;
+    if (context.collaborationRestricted && ref.kind === "desktop")
+      throw new Error("Shared bots cannot use a host computer.");
     await deps.sandbox.prepare(ref, context);
     const replacement =
       ref.fresh === true ||
@@ -379,12 +410,12 @@ export async function provisionComputer(
     const activeControl = hasActiveComputerControl(existing);
     const activated = await deps.prisma.computer.updateMany({
       where: {
+        ...botAccess,
         id: computerId,
         state: "booting",
         updatedAt: claimStamp,
         ...previousRef,
         maintenanceId: existing.maintenanceId ?? null,
-        ...(context.botId ? { bots: { some: { id: context.botId, archivedAt: null } } } : {}),
       },
       data: {
         state: "running",

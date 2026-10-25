@@ -43,6 +43,23 @@ Known gaps:
 - **Saved state.** Memory, skills and earlier conversation are treated as yours. Text that an earlier run saved there is not flagged as outside content, including a skill a routine's instructions pull in, whose sites that routine's runs may fetch.
 - **Auto Review on new sites.** The reviewer is a model judging whether a site fits your words. It never reads what the run took in, but injected text can still pick the URL it judges, so it may pass a site that looks plausible for the task or data hidden in an innocent-looking URL. Turn Auto Review off to have a person approve every new site in runs you can answer; webhook runs then refuse every new site.
 
+## Shared bots
+
+A shared bot is one identity with one main conversation and one memory. Granting access
+exposes the existing conversation as well as future messages and replies. Its knowledge
+is not partitioned by participant: do not give it information that must remain private
+from its collaborators. Revoking access cannot retract information already seen.
+
+Collaboration does not grant ownership, access to another person's credentials, or direct
+control of the bot's workstation. Requests retain their human author, while execution uses
+the bot's configured owner resources rather than the sender's personal model connection.
+Only the owner can change standing instructions or grant access and approval authority.
+
+Files, browser sessions, and logged-in accounts on a workstation are available to the bots
+working there. A chat permission cannot isolate those resources. Sharing requires a
+dedicated, non-host bot computer; review its existing files and sessions before sharing.
+Company membership alone does not grant access to a bot.
+
 ## Supported versions
 
 We support security fixes on the current `main` branch and the latest release (beta).

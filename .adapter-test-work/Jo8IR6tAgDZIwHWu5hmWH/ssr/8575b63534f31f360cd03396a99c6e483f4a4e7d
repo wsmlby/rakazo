@@ -1,0 +1,51 @@
+__vite_ssr_exportName__("isFarewell", () => { try { return isFarewell } catch {} });
+/** Lead-ins and tails that may wrap a closing phrase without changing what it means. */
+const FILLER = [
+	"thank you",
+	"for today",
+	"for now",
+	"alright",
+	"perfect",
+	"thanks",
+	"great",
+	"okay",
+	"cool",
+	"bye",
+	"ok"
+];
+const CLOSING = [
+	"that'll be all",
+	"that will be all",
+	"that's all for now",
+	"that's everything",
+	"that's all",
+	"that's it",
+	"talk to you later",
+	"catch you later",
+	"talk later",
+	"goodbye",
+	"good bye",
+	"see you",
+	"see ya",
+	"end the call",
+	"end call",
+	"hang up",
+	"i'm done",
+	"we're done",
+	"nothing else",
+	"bye"
+];
+const filler = FILLER.join("|");
+// Whole-utterance only: a closing phrase alone, give or take filler on either side.
+const FAREWELL = new RegExp(`^(?:(?:${filler}) )*(?:${CLOSING.join("|")})(?: (?:${filler}))*$`);
+const MAX_WORDS = 8;
+/** True when the whole utterance is the caller saying goodbye, not a sentence mentioning one. */
+function isFarewell(text) {
+	const words = text.toLowerCase().replace(/[‘’]/g, "'").replace(/[^a-z0-9'\s]+/g, " ").trim().split(/\s+/).filter(Boolean);
+	if (!words.length || words.length > MAX_WORDS) return false;
+	return FAREWELL.test(words.join(" "));
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7QUFDQSxNQUFNLFNBQVM7Q0FDYjtDQUNBO0NBQ0E7Q0FDQTtDQUNBO0NBQ0E7Q0FDQTtDQUNBO0NBQ0E7Q0FDQTtDQUNBO0FBQ0Y7QUFFQSxNQUFNLFVBQVU7Q0FDZDtDQUNBO0NBQ0E7Q0FDQTtDQUNBO0NBQ0E7Q0FDQTtDQUNBO0NBQ0E7Q0FDQTtDQUNBO0NBQ0E7Q0FDQTtDQUNBO0NBQ0E7Q0FDQTtDQUNBO0NBQ0E7Q0FDQTtDQUNBO0FBQ0Y7QUFFQSxNQUFNLFNBQVMsT0FBTyxLQUFLLEdBQUc7O0FBRTlCLE1BQU0sV0FBVyxJQUFJLE9BQU8sVUFBVSxPQUFPLFNBQVMsUUFBUSxLQUFLLEdBQUcsRUFBRSxVQUFVLE9BQU8sS0FBSztBQUM5RixNQUFNLFlBQVk7O0FBR1gsU0FBUyxXQUFXLE1BQXVCO0NBQ2hELE1BQU0sUUFBUSxLQUNYLFlBQVksQ0FBQyxDQUNiLFFBQVEsU0FBUyxHQUFHLENBQUMsQ0FDckIsUUFBUSxrQkFBa0IsR0FBRyxDQUFDLENBQzlCLEtBQUssQ0FBQyxDQUNOLE1BQU0sS0FBSyxDQUFDLENBQ1osT0FBTyxPQUFPO0NBQ2pCLElBQUksQ0FBQyxNQUFNLFVBQVUsTUFBTSxTQUFTLFdBQVcsT0FBTztDQUN0RCxPQUFPLFNBQVMsS0FBSyxNQUFNLEtBQUssR0FBRyxDQUFDO0FBQ3RDIiwibmFtZXMiOltdLCJpZ25vcmVMaXN0IjpbXSwic291cmNlcyI6WyJmYXJld2VsbC50cyJdLCJzb3VyY2VzQ29udGVudCI6WyIvKiogTGVhZC1pbnMgYW5kIHRhaWxzIHRoYXQgbWF5IHdyYXAgYSBjbG9zaW5nIHBocmFzZSB3aXRob3V0IGNoYW5naW5nIHdoYXQgaXQgbWVhbnMuICovXG5jb25zdCBGSUxMRVIgPSBbXG4gIFwidGhhbmsgeW91XCIsXG4gIFwiZm9yIHRvZGF5XCIsXG4gIFwiZm9yIG5vd1wiLFxuICBcImFscmlnaHRcIixcbiAgXCJwZXJmZWN0XCIsXG4gIFwidGhhbmtzXCIsXG4gIFwiZ3JlYXRcIixcbiAgXCJva2F5XCIsXG4gIFwiY29vbFwiLFxuICBcImJ5ZVwiLFxuICBcIm9rXCIsXG5dO1xuXG5jb25zdCBDTE9TSU5HID0gW1xuICBcInRoYXQnbGwgYmUgYWxsXCIsXG4gIFwidGhhdCB3aWxsIGJlIGFsbFwiLFxuICBcInRoYXQncyBhbGwgZm9yIG5vd1wiLFxuICBcInRoYXQncyBldmVyeXRoaW5nXCIsXG4gIFwidGhhdCdzIGFsbFwiLFxuICBcInRoYXQncyBpdFwiLFxuICBcInRhbGsgdG8geW91IGxhdGVyXCIsXG4gIFwiY2F0Y2ggeW91IGxhdGVyXCIsXG4gIFwidGFsayBsYXRlclwiLFxuICBcImdvb2RieWVcIixcbiAgXCJnb29kIGJ5ZVwiLFxuICBcInNlZSB5b3VcIixcbiAgXCJzZWUgeWFcIixcbiAgXCJlbmQgdGhlIGNhbGxcIixcbiAgXCJlbmQgY2FsbFwiLFxuICBcImhhbmcgdXBcIixcbiAgXCJpJ20gZG9uZVwiLFxuICBcIndlJ3JlIGRvbmVcIixcbiAgXCJub3RoaW5nIGVsc2VcIixcbiAgXCJieWVcIixcbl07XG5cbmNvbnN0IGZpbGxlciA9IEZJTExFUi5qb2luKFwifFwiKTtcbi8vIFdob2xlLXV0dGVyYW5jZSBvbmx5OiBhIGNsb3NpbmcgcGhyYXNlIGFsb25lLCBnaXZlIG9yIHRha2UgZmlsbGVyIG9uIGVpdGhlciBzaWRlLlxuY29uc3QgRkFSRVdFTEwgPSBuZXcgUmVnRXhwKGBeKD86KD86JHtmaWxsZXJ9KSApKig/OiR7Q0xPU0lORy5qb2luKFwifFwiKX0pKD86ICg/OiR7ZmlsbGVyfSkpKiRgKTtcbmNvbnN0IE1BWF9XT1JEUyA9IDg7XG5cbi8qKiBUcnVlIHdoZW4gdGhlIHdob2xlIHV0dGVyYW5jZSBpcyB0aGUgY2FsbGVyIHNheWluZyBnb29kYnllLCBub3QgYSBzZW50ZW5jZSBtZW50aW9uaW5nIG9uZS4gKi9cbmV4cG9ydCBmdW5jdGlvbiBpc0ZhcmV3ZWxsKHRleHQ6IHN0cmluZyk6IGJvb2xlYW4ge1xuICBjb25zdCB3b3JkcyA9IHRleHRcbiAgICAudG9Mb3dlckNhc2UoKVxuICAgIC5yZXBsYWNlKC9b4oCY4oCZXS9nLCBcIidcIilcbiAgICAucmVwbGFjZSgvW15hLXowLTknXFxzXSsvZywgXCIgXCIpXG4gICAgLnRyaW0oKVxuICAgIC5zcGxpdCgvXFxzKy8pXG4gICAgLmZpbHRlcihCb29sZWFuKTtcbiAgaWYgKCF3b3Jkcy5sZW5ndGggfHwgd29yZHMubGVuZ3RoID4gTUFYX1dPUkRTKSByZXR1cm4gZmFsc2U7XG4gIHJldHVybiBGQVJFV0VMTC50ZXN0KHdvcmRzLmpvaW4oXCIgXCIpKTtcbn1cbiJdLCJmaWxlIjoiL3BhY2thZ2VzL2NvcmUvc3JjL2ZhcmV3ZWxsLnRzIn0=
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvY29yZS9zcmMvZmFyZXdlbGwudHMiLCIvcGFja2FnZXMvY29yZS9zcmMvZmFyZXdlbGwudHMiLFtdXQ==

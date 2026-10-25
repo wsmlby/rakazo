@@ -1,0 +1,47 @@
+__vite_ssr_exportName__("AI_DISCLOSURE_VERSION", () => { try { return AI_DISCLOSURE_VERSION } catch {} });
+__vite_ssr_exportName__("AI_PRIVACY_URL", () => { try { return AI_PRIVACY_URL } catch {} });
+__vite_ssr_exportName__("AiDataUseSchema", () => { try { return AiDataUseSchema } catch {} });
+__vite_ssr_exportName__("AI_DATA_DISCLOSURES", () => { try { return AI_DATA_DISCLOSURES } catch {} });
+__vite_ssr_exportName__("AiConsentQuerySchema", () => { try { return AiConsentQuerySchema } catch {} });
+__vite_ssr_exportName__("AiRecipientSchema", () => { try { return AiRecipientSchema } catch {} });
+__vite_ssr_exportName__("AiConsentStatusSchema", () => { try { return AiConsentStatusSchema } catch {} });
+__vite_ssr_exportName__("AI_CONSENT_REQUIRED", () => { try { return AI_CONSENT_REQUIRED } catch {} });
+const __vite_ssr_import_0__ = await __vite_ssr_import__("/node_modules/.pnpm/zod@4.6.7/node_modules/zod/index.js");
+
+const AI_DISCLOSURE_VERSION = "2026-09-14";
+const AI_PRIVACY_URL = "https://rakazo.com/privacy/";
+const AiDataUseSchema = __vite_ssr_import_0__.enum([
+	"model",
+	"voice",
+	"memory"
+]);
+const AI_DATA_DISCLOSURES = {
+	model: "Messages, chat history, bot instructions, memories, attachments, screenshots and connected-app content are sent to run your bots, including routines.",
+	voice: "Your recordings are sent for transcription, and text you play is sent to generate speech.",
+	memory: "Conversation summaries, memories, searches and bot and Space IDs are sent to store and recall context."
+};
+const AiConsentQuerySchema = __vite_ssr_import_0__.object({
+	botId: __vite_ssr_import_0__.string().optional(),
+	groupId: __vite_ssr_import_0__.string().optional(),
+	routineId: __vite_ssr_import_0__.string().optional(),
+	uses: __vite_ssr_import_0__.array(AiDataUseSchema).optional()
+}).default({});
+const AiRecipientSchema = __vite_ssr_import_0__.object({
+	key: __vite_ssr_import_0__.string(),
+	name: __vite_ssr_import_0__.string(),
+	use: AiDataUseSchema,
+	detail: __vite_ssr_import_0__.string(),
+	privacyUrl: __vite_ssr_import_0__.string().url().optional(),
+	allowed: __vite_ssr_import_0__.boolean()
+});
+const AiConsentStatusSchema = __vite_ssr_import_0__.object({
+	scope: __vite_ssr_import_0__.string(),
+	version: __vite_ssr_import_0__.string(),
+	recipients: __vite_ssr_import_0__.array(AiRecipientSchema),
+	privacyUrl: __vite_ssr_import_0__.string().url().optional()
+});
+const AI_CONSENT_REQUIRED = "Review AI data sharing in Account settings before continuing.";
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7Ozs7Ozs7QUFBQTs7QUFFTyxNQUFNLHdCQUF3QjtBQUM5QixNQUFNLGlCQUFpQjtBQUN2QixNQUFNLGtCQUFrQixzQkFBRSxLQUFLO0NBQUM7Q0FBUztDQUFTO0FBQVEsQ0FBQztBQUUzRCxNQUFNLHNCQUFpRDtDQUM1RCxPQUNFO0NBQ0YsT0FDRTtDQUNGLFFBQ0U7QUFDSjtBQUNPLE1BQU0sdUJBQXVCLHNCQUNqQyxPQUFPO0NBQ04sT0FBTyxzQkFBRSxPQUFPLENBQUMsQ0FBQyxTQUFTO0NBQzNCLFNBQVMsc0JBQUUsT0FBTyxDQUFDLENBQUMsU0FBUztDQUM3QixXQUFXLHNCQUFFLE9BQU8sQ0FBQyxDQUFDLFNBQVM7Q0FDL0IsTUFBTSxzQkFBRSxNQUFNLGVBQWUsQ0FBQyxDQUFDLFNBQVM7QUFDMUMsQ0FBQyxDQUFDLENBQ0QsUUFBUSxDQUFDLENBQUM7QUFFTixNQUFNLG9CQUFvQixzQkFBRSxPQUFPO0NBQ3hDLEtBQUssc0JBQUUsT0FBTztDQUNkLE1BQU0sc0JBQUUsT0FBTztDQUNmLEtBQUs7Q0FDTCxRQUFRLHNCQUFFLE9BQU87Q0FDakIsWUFBWSxzQkFBRSxPQUFPLENBQUMsQ0FBQyxJQUFJLENBQUMsQ0FBQyxTQUFTO0NBQ3RDLFNBQVMsc0JBQUUsUUFBUTtBQUNyQixDQUFDO0FBRU0sTUFBTSx3QkFBd0Isc0JBQUUsT0FBTztDQUM1QyxPQUFPLHNCQUFFLE9BQU87Q0FDaEIsU0FBUyxzQkFBRSxPQUFPO0NBQ2xCLFlBQVksc0JBQUUsTUFBTSxpQkFBaUI7Q0FDckMsWUFBWSxzQkFBRSxPQUFPLENBQUMsQ0FBQyxJQUFJLENBQUMsQ0FBQyxTQUFTO0FBQ3hDLENBQUM7QUFFTSxNQUFNLHNCQUFzQiIsIm5hbWVzIjpbXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZXMiOlsiYWktY29uc2VudC50cyJdLCJzb3VyY2VzQ29udGVudCI6WyJpbXBvcnQgKiBhcyB6IGZyb20gXCJ6b2RcIjtcblxuZXhwb3J0IGNvbnN0IEFJX0RJU0NMT1NVUkVfVkVSU0lPTiA9IFwiMjAyNi0wOS0xNFwiO1xuZXhwb3J0IGNvbnN0IEFJX1BSSVZBQ1lfVVJMID0gXCJodHRwczovL3Jha2F6by5jb20vcHJpdmFjeS9cIjtcbmV4cG9ydCBjb25zdCBBaURhdGFVc2VTY2hlbWEgPSB6LmVudW0oW1wibW9kZWxcIiwgXCJ2b2ljZVwiLCBcIm1lbW9yeVwiXSk7XG5leHBvcnQgdHlwZSBBaURhdGFVc2UgPSB6LmluZmVyPHR5cGVvZiBBaURhdGFVc2VTY2hlbWE+O1xuZXhwb3J0IGNvbnN0IEFJX0RBVEFfRElTQ0xPU1VSRVM6IFJlY29yZDxBaURhdGFVc2UsIHN0cmluZz4gPSB7XG4gIG1vZGVsOlxuICAgIFwiTWVzc2FnZXMsIGNoYXQgaGlzdG9yeSwgYm90IGluc3RydWN0aW9ucywgbWVtb3JpZXMsIGF0dGFjaG1lbnRzLCBzY3JlZW5zaG90cyBhbmQgY29ubmVjdGVkLWFwcCBjb250ZW50IGFyZSBzZW50IHRvIHJ1biB5b3VyIGJvdHMsIGluY2x1ZGluZyByb3V0aW5lcy5cIixcbiAgdm9pY2U6XG4gICAgXCJZb3VyIHJlY29yZGluZ3MgYXJlIHNlbnQgZm9yIHRyYW5zY3JpcHRpb24sIGFuZCB0ZXh0IHlvdSBwbGF5IGlzIHNlbnQgdG8gZ2VuZXJhdGUgc3BlZWNoLlwiLFxuICBtZW1vcnk6XG4gICAgXCJDb252ZXJzYXRpb24gc3VtbWFyaWVzLCBtZW1vcmllcywgc2VhcmNoZXMgYW5kIGJvdCBhbmQgU3BhY2UgSURzIGFyZSBzZW50IHRvIHN0b3JlIGFuZCByZWNhbGwgY29udGV4dC5cIixcbn07XG5leHBvcnQgY29uc3QgQWlDb25zZW50UXVlcnlTY2hlbWEgPSB6XG4gIC5vYmplY3Qoe1xuICAgIGJvdElkOiB6LnN0cmluZygpLm9wdGlvbmFsKCksXG4gICAgZ3JvdXBJZDogei5zdHJpbmcoKS5vcHRpb25hbCgpLFxuICAgIHJvdXRpbmVJZDogei5zdHJpbmcoKS5vcHRpb25hbCgpLFxuICAgIHVzZXM6IHouYXJyYXkoQWlEYXRhVXNlU2NoZW1hKS5vcHRpb25hbCgpLFxuICB9KVxuICAuZGVmYXVsdCh7fSk7XG5leHBvcnQgdHlwZSBBaUNvbnNlbnRRdWVyeSA9IHouaW5mZXI8dHlwZW9mIEFpQ29uc2VudFF1ZXJ5U2NoZW1hPjtcbmV4cG9ydCBjb25zdCBBaVJlY2lwaWVudFNjaGVtYSA9IHoub2JqZWN0KHtcbiAga2V5OiB6LnN0cmluZygpLFxuICBuYW1lOiB6LnN0cmluZygpLFxuICB1c2U6IEFpRGF0YVVzZVNjaGVtYSxcbiAgZGV0YWlsOiB6LnN0cmluZygpLFxuICBwcml2YWN5VXJsOiB6LnN0cmluZygpLnVybCgpLm9wdGlvbmFsKCksXG4gIGFsbG93ZWQ6IHouYm9vbGVhbigpLFxufSk7XG5leHBvcnQgdHlwZSBBaVJlY2lwaWVudCA9IHouaW5mZXI8dHlwZW9mIEFpUmVjaXBpZW50U2NoZW1hPjtcbmV4cG9ydCBjb25zdCBBaUNvbnNlbnRTdGF0dXNTY2hlbWEgPSB6Lm9iamVjdCh7XG4gIHNjb3BlOiB6LnN0cmluZygpLFxuICB2ZXJzaW9uOiB6LnN0cmluZygpLFxuICByZWNpcGllbnRzOiB6LmFycmF5KEFpUmVjaXBpZW50U2NoZW1hKSxcbiAgcHJpdmFjeVVybDogei5zdHJpbmcoKS51cmwoKS5vcHRpb25hbCgpLFxufSk7XG5leHBvcnQgdHlwZSBBaUNvbnNlbnRTdGF0dXMgPSB6LmluZmVyPHR5cGVvZiBBaUNvbnNlbnRTdGF0dXNTY2hlbWE+O1xuZXhwb3J0IGNvbnN0IEFJX0NPTlNFTlRfUkVRVUlSRUQgPSBcIlJldmlldyBBSSBkYXRhIHNoYXJpbmcgaW4gQWNjb3VudCBzZXR0aW5ncyBiZWZvcmUgY29udGludWluZy5cIjtcbiJdLCJmaWxlIjoiL3BhY2thZ2VzL2NvbnRyYWN0cy9zcmMvYWktY29uc2VudC50cyJ9
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvY29udHJhY3RzL3NyYy9haS1jb25zZW50LnRzIiwiL3BhY2thZ2VzL2NvbnRyYWN0cy9zcmMvYWktY29uc2VudC50cyIsW11d

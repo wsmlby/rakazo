@@ -22,6 +22,7 @@ import {
   UpdateTicketInput,
 } from "./board.js";
 import { BotSecretMetadata, BotSecretPutInput, StoredBotSecretName } from "./bot-secrets.js";
+import { companyInvitationsContract } from "./company-invitations.js";
 import {
   ActionApprovalRuleSchema,
   ActionAutoReviewSettingsSchema,
@@ -39,6 +40,9 @@ import {
   BotSchema,
   BotSectionName,
   BotSectionSchema,
+  BotSharingGrantInput,
+  BotSharingStateSchema,
+  BotSharingTargetInput,
   CapabilityInstallSchema,
   ComputerModeSchema,
   ComputerReleaseReasonSchema,
@@ -181,6 +185,7 @@ const threadSendInput = threadTarget
 const spaceName = z.string().trim().min(1).max(60);
 
 export const appContract = {
+  companyInvitations: companyInvitationsContract,
   analytics: { screen: oc.input(AnalyticsScreenInput).output(z.object({ ok: z.literal(true) })) },
   aiConsent: {
     status: oc.input(AiConsentQuerySchema).output(AiConsentStatusSchema),
@@ -338,6 +343,12 @@ export const appContract = {
       .output(z.object({ ok: z.literal(true) })),
   },
   bots: {
+    sharing: {
+      get: oc.input(botId).output(BotSharingStateSchema),
+      grant: oc.input(BotSharingGrantInput).output(z.object({ ok: z.literal(true) })),
+      revoke: oc.input(BotSharingTargetInput).output(z.object({ ok: z.literal(true) })),
+      transfer: oc.input(BotSharingTargetInput).output(z.object({ ok: z.literal(true) })),
+    },
     list: oc.output(z.array(BotSchema)),
     listArchived: oc.output(z.array(BotSchema)),
     get: oc.input(botId).output(BotSchema),
@@ -435,7 +446,9 @@ export const appContract = {
         }),
       )
       .output(z.object({ ok: z.literal(true), runIds: z.array(Id).optional() })),
-    stop: oc.input(threadTarget).output(z.object({ ok: z.literal(true) })),
+    stop: oc
+      .input(threadTarget.safeExtend({ runId: Id.optional() }))
+      .output(z.object({ ok: z.literal(true) })),
     followUp: oc
       .input(
         threadTarget.safeExtend({

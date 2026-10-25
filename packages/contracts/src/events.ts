@@ -385,6 +385,8 @@ export const ReplyPreviewSchema = z.object({
 export type ReplyPreview = z.infer<typeof ReplyPreviewSchema>;
 
 export const ThreadMessageSchema = z.object({
+  authorUserId: Id.optional(),
+  authorName: z.string().optional(),
   id: Id,
   threadId: Id,
   seq: z.number().int().nonnegative(),

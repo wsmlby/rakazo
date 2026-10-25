@@ -88,6 +88,10 @@ export const InstructionVersionSchema = z.object({
 
 export const BotSchema = z.object({
   id: Id,
+  ownerUserId: Id.optional(),
+  accessRole: z.enum(["owner", "collaborator"]).optional(),
+  canApprove: z.boolean().optional(),
+  collaborationRestricted: z.boolean().optional(),
   spaceId: Id,
   name: z.string(),
   title: z.string(),
@@ -135,6 +139,27 @@ export const BotSchema = z.object({
     .optional(),
 });
 export type Bot = z.infer<typeof BotSchema>;
+
+export const BotSharingMemberSchema = z.object({
+  userId: Id,
+  name: z.string(),
+  canApprove: z.boolean(),
+});
+export type BotSharingMember = z.infer<typeof BotSharingMemberSchema>;
+
+export const BotSharingStateSchema = z.object({
+  members: z.array(BotSharingMemberSchema),
+  eligibleMembers: z.array(z.object({ userId: Id, name: z.string() })),
+});
+export type BotSharingState = z.infer<typeof BotSharingStateSchema>;
+
+export const BotSharingTargetInput = z.object({ botId: Id, userId: Id });
+export type BotSharingTargetInput = z.infer<typeof BotSharingTargetInput>;
+
+export const BotSharingGrantInput = BotSharingTargetInput.extend({
+  canApprove: z.boolean().optional(),
+});
+export type BotSharingGrantInput = z.infer<typeof BotSharingGrantInput>;
 
 export const ReorderBotsInput = z.object({
   botIds: z
@@ -234,6 +259,10 @@ export type BotSection = z.infer<typeof BotSectionSchema>;
  */
 export const SpaceBotSchema = BotSchema.pick({
   id: true,
+  ownerUserId: true,
+  accessRole: true,
+  canApprove: true,
+  collaborationRestricted: true,
   spaceId: true,
   name: true,
   title: true,
@@ -1068,6 +1097,7 @@ export const MessagingAgentConnectionSchema = z.object({
 export type MessagingAgentConnection = z.infer<typeof MessagingAgentConnectionSchema>;
 
 export const RunSchema = z.object({
+  requesterUserId: Id.optional(),
   id: Id,
   userId: Id.optional(),
   botId: Id,

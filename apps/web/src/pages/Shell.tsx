@@ -1968,14 +1968,23 @@ function SpaceShell() {
     setReplyQuote(null);
   }, []);
   const currentRuns = activeThreadRuns(activeSnapshot);
-  const answerableAskIds = useMemo(() => answerableAskMessageIds(activeSnapshot), [activeSnapshot]);
+  const canApprove = active?.accessRole !== "collaborator" || active.canApprove === true;
+  const answerableAskIds = useMemo(
+    () => (canApprove ? answerableAskMessageIds(activeSnapshot) : new Set<string>()),
+    [activeSnapshot, canApprove],
+  );
   const dismissableAskIds = useMemo(
-    () => dismissableAskMessageIds(activeSnapshot, userId),
-    [activeSnapshot, userId],
+    () => (canApprove ? dismissableAskMessageIds(activeSnapshot, userId) : new Set<string>()),
+    [activeSnapshot, userId, canApprove],
   );
   const workingRuns = currentRuns.filter((run) => isRunWorking(run.status));
   const transcriptRunning = workingRuns.length > 0;
-  const composerRunning = currentRuns.some((run) => isActive(run.status));
+  const composerRunning =
+    active?.accessRole === "collaborator"
+      ? currentRuns.some(
+          (run) => run.status === "queued" && Boolean(userId) && run.requesterUserId === userId,
+        )
+      : currentRuns.some((run) => isActive(run.status));
   const runError = threadRunError(activeSnapshot, dismissedRunErrorIds);
   const displayedRunError = !sendError ? runError : null;
   const displayedRunErrorId = displayedRunError ? (activeSnapshot?.run?.id ?? null) : null;
@@ -2018,7 +2027,7 @@ function SpaceShell() {
   );
   const replyTargetName = activeReplyTarget
     ? activeReplyTarget.role === "user"
-      ? t`You`
+      ? (activeReplyTarget.authorName ?? "")
       : (resolveTranscriptMemberName(activeReplyTarget.botId) ?? active?.name ?? t`Bot`)
     : undefined;
   const composerMentionTargets = useMemo(
@@ -2854,7 +2863,7 @@ function SpaceShell() {
     const id = botId ?? active?.id;
     if (!id) return false;
     const bot = botsRef.current.find((candidate) => candidate.id === id);
-    if (!bot) return false;
+    if (!bot || bot.accessRole === "collaborator") return false;
     computerBotIdRef.current = id;
     setComputerBotId(id);
     const cached = computerCacheRef.current.get(id);
@@ -3441,7 +3450,10 @@ function SpaceShell() {
               </span>
             </button>
             <div className="flex items-center justify-self-end gap-2">
-              {bootstrapMe?.phoneCallsEnabled && !inGroup && active ? (
+              {bootstrapMe?.phoneCallsEnabled &&
+              !inGroup &&
+              active &&
+              active.accessRole !== "collaborator" ? (
                 <IconTooltip label={call?.botId === active.id ? t`Open call` : t`Call`}>
                   <button
                     type="button"
@@ -3461,7 +3473,7 @@ function SpaceShell() {
                   </button>
                 </IconTooltip>
               ) : null}
-              {!inGroup && active ? (
+              {!inGroup && active && active.accessRole !== "collaborator" ? (
                 <IconTooltip label={t`Agent computer`}>
                   <button
                     type="button"
@@ -3511,7 +3523,10 @@ function SpaceShell() {
               workingBots={workingBots}
               userBubble={userBubble}
               onCallBack={
-                bootstrapMe?.phoneCallsEnabled && !inGroup && active
+                bootstrapMe?.phoneCallsEnabled &&
+                !inGroup &&
+                active &&
+                active.accessRole !== "collaborator"
                   ? () => callBot(active)
                   : undefined
               }
@@ -3559,6 +3574,7 @@ function SpaceShell() {
               speakingMessageId={speakingMessageId}
               onSpeak={speakMessage}
               onOpenComputer={onOpenComputer}
+              canManageBot={active?.accessRole !== "collaborator"}
             />
           )}
         </div>
@@ -3578,12 +3594,16 @@ function SpaceShell() {
             pendingAttachments={activePendingAttachments}
             attachmentNotice={attachmentNotice}
             sendError={sendError}
-            onOpenModels={() => {
-              if (active && !inGroup) {
-                setPanel("settings");
-                setModelFocusRequest(Date.now());
-              } else openSettings("models");
-            }}
+            onOpenModels={
+              active?.accessRole === "collaborator"
+                ? undefined
+                : () => {
+                    if (active && !inGroup) {
+                      setPanel("settings");
+                      setModelFocusRequest(Date.now());
+                    } else openSettings("models");
+                  }
+            }
             runError={displayedRunError}
             runErrorId={displayedRunErrorId}
             onRunErrorPresented={handleRunErrorPresented}
@@ -3594,7 +3614,9 @@ function SpaceShell() {
             onRemoveAttachment={removeAttachment}
             onSend={sendMessage}
             onStop={stopRun}
-            phoneCallsEnabled={bootstrapMe?.phoneCallsEnabled === true}
+            phoneCallsEnabled={
+              bootstrapMe?.phoneCallsEnabled === true && active?.accessRole !== "collaborator"
+            }
             dictationTranscribe={voiceStatus ? Boolean(voiceStatus.transcribe) : undefined}
             artifactTarget={transcriptArtifactTarget}
             replyTarget={activeReplyTarget}
@@ -3623,7 +3645,11 @@ function SpaceShell() {
 
       <CallCard onSettings={() => openSettings("voice")} />
       <IncomingCall
-        bots={bootstrapMe?.phoneCallsEnabled ? bots : []}
+        bots={
+          bootstrapMe?.phoneCallsEnabled
+            ? bots.filter((bot) => bot.accessRole !== "collaborator")
+            : []
+        }
         transcribe={voiceStatus ? Boolean(voiceStatus.transcribe) : undefined}
         onAnswered={(botId) => navigate(`/app/${botId}`)}
       />
@@ -3656,7 +3682,7 @@ function SpaceShell() {
                       }}
                     />
                   ) : null}
-                  {active ? (
+                  {active && active.accessRole !== "collaborator" ? (
                     <Button
                       variant="ghost"
                       size="icon-sm"
@@ -3682,7 +3708,7 @@ function SpaceShell() {
                 </div>
               </div>
             ) : null}
-            {panel === "computer" && active ? (
+            {panel === "computer" && active && active.accessRole !== "collaborator" ? (
               <ComputerPanel
                 bot={active}
                 computer={computer}
@@ -3755,8 +3781,22 @@ function SpaceShell() {
               <BotSettings
                 key={active.id}
                 bot={active}
+                onSharingChanged={async (transferred) => {
+                  if (transferred) {
+                    setBots((current) =>
+                      current.map((bot) =>
+                        bot.id === active.id
+                          ? { ...bot, accessRole: "collaborator", canApprove: false }
+                          : bot,
+                      ),
+                    );
+                    setPanel(null);
+                  }
+                  await refreshBots();
+                }}
                 focusModel={modelFocusRequest}
                 onOpenConnections={() => openSettings("models")}
+                onOpenCompany={() => openSettings("general")}
                 memoryProviderConfigured={memoryProviderConfig != null}
                 onSkillsChange={setAgentSkills}
                 onSave={async ({ computerMode, ...patch }) => {

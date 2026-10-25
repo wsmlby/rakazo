@@ -403,6 +403,13 @@ import {
   secretPausedToolResult,
   tryCompleteConnectionWithCode,
 } from "./run-secret.js";
+import {
+  SHARED_BOT_COMPUTER_TOOLS,
+  sharedBotTaughtSkill,
+  sharedBotToolAllowed,
+  sharedBotToolError,
+  sharedBotWorkstationError,
+} from "./shared-bot-policy.js";
 import { restoreTurnCheckpoint, unresolvedTurnCheckpointCalls } from "./turn-checkpoint.js";
 
 export { selectRunConnections } from "./connection-context.js";
@@ -457,6 +464,7 @@ import { TASK_CATALOG_GUIDANCE, taskCatalogFromTool } from "./task-catalog.js";
 import { getActiveTeachingSession, parsePlaybook } from "./teaching-session.js";
 import {
   attachWorkspaceFileToThread,
+  conversationAttachmentWhere,
   currentTurnFilesInstruction,
   listCurrentTurnFiles,
   listRecentThreadFiles,
@@ -3693,12 +3701,94 @@ export function createRunExecutor(deps: ExecutorDeps) {
       const leaseTarget = await deps.prisma.bot.findUniqueOrThrow({
         where: { id: run.botId },
         select: {
+          userId: true,
+          spaceId: true,
+          collaborationRestricted: true,
           computerId: true,
           computerSwitching: true,
-          computer: { select: { scope: true } },
+          computer: { select: { scope: true, kind: true, userId: true, spaceId: true } },
         },
       });
-      if (!leaseTarget.computerId) throw new Error("Bot has no computer");
+      const conversationOnly = Boolean(leaseTarget.collaborationRestricted);
+      const sharedRequesterAuthorized = async (target: { userId: string; spaceId: string }) => {
+        if (run.userId !== target.userId || run.spaceId !== target.spaceId) return false;
+        const requesterUserId = run.requesterUserId ?? run.userId;
+        // Space membership is backed by the company membership's cascading foreign key.
+        const membership = await deps.prisma.spaceMember.findUnique({
+          where: { spaceId_userId: { spaceId: run.spaceId, userId: requesterUserId } },
+          select: { id: true },
+        });
+        if (!membership) return false;
+        if (requesterUserId === target.userId) return true;
+        return Boolean(
+          await deps.prisma.botCollaborator.findFirst({
+            where: {
+              botId: run.botId,
+              spaceId: run.spaceId,
+              userId: requesterUserId,
+              bot: { space: { memberships: { some: { userId: requesterUserId } } } },
+            },
+          }),
+        );
+      };
+      const sharedComputerError = async (target: typeof leaseTarget) => {
+        const assignedBots = target.computerId
+          ? await deps.prisma.bot.findMany({
+              where: { computerId: target.computerId },
+              select: { id: true },
+            })
+          : [];
+        return sharedBotWorkstationError(
+          target.computer,
+          assignedBots.map((bot) => bot.id),
+          run.botId,
+          run,
+        );
+      };
+      const assertSharedAccess = async (computerId?: string) => {
+        const target = await deps.prisma.bot.findUniqueOrThrow({
+          where: { id: run.botId },
+          select: {
+            userId: true,
+            spaceId: true,
+            collaborationRestricted: true,
+            computerId: true,
+            computerSwitching: true,
+            computer: { select: { scope: true, kind: true, userId: true, spaceId: true } },
+          },
+        });
+        if (!(await sharedRequesterAuthorized(target)))
+          throw new Error("Shared bot authorization is no longer valid.");
+        if (
+          computerId &&
+          (target.computerId !== computerId ||
+            target.computerSwitching ||
+            (await sharedComputerError(target)))
+        )
+          throw new Error("Shared bot computer access is no longer valid.");
+      };
+      if (conversationOnly) {
+        const workstationError = leaseTarget.computerId
+          ? await sharedComputerError(leaseTarget)
+          : undefined;
+        if (workstationError || !(await sharedRequesterAuthorized(leaseTarget))) {
+          await deps.prisma.run.updateMany({
+            where: { id: runId, leaseOwner: workerId, leaseFence: fence, status: "running" },
+            data: {
+              status: "cancelled",
+              completedAt: new Date(),
+              leaseOwner: null,
+              leaseExpiresAt: null,
+            },
+          });
+          await deps.prisma.task.updateMany({
+            where: { id: run.taskId },
+            data: { status: "cancelled" },
+          });
+          return;
+        }
+      }
+      if (!leaseTarget.computerId && !conversationOnly) throw new Error("Bot has no computer");
       if (leaseTarget.computerSwitching) {
         await requeueComputerRun(deps, runId, workerId, fence, resumeCheckpoint, heldForTakeover);
         return;
@@ -3718,13 +3808,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
       }
       let computerLease: ComputerExecutionLease | null = null;
       try {
-        computerLease = await acquireComputerExecutionLease(deps.prisma, {
-          computerId: leaseTarget.computerId,
-          runId,
-          botId: run.botId,
-          resumeHeldLease,
-        });
-        if (!computerLease && leaseTarget.computer?.scope === "dedicated") {
+        computerLease = leaseTarget.computerId
+          ? await acquireComputerExecutionLease(deps.prisma, {
+              computerId: leaseTarget.computerId,
+              runId,
+              botId: run.botId,
+              resumeHeldLease,
+            })
+          : null;
+        if (
+          !computerLease &&
+          leaseTarget.computerId &&
+          leaseTarget.computer?.scope === "dedicated"
+        ) {
           computerLease = await acquireDedicatedScreenLeaseFence(deps.prisma, {
             computerId: leaseTarget.computerId,
             runId,
@@ -3871,21 +3967,23 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }),
           deps.prisma.thread.findUniqueOrThrow({ where: { id: run.threadId } }),
           loadRunHistoryMessages(deps.prisma, run, LEGACY_HISTORY_WINDOW_SIZE, channelId),
-          run.trigger === "bot_message"
+          !conversationOnly && run.trigger === "bot_message"
             ? loadBotMessageContext(deps.prisma, run.sourceMessageId)
             : Promise.resolve(undefined),
           deps.prisma.task.findUniqueOrThrow({ where: { id: run.taskId } }),
-          deps.prisma.connection.findMany({
-            where: { userId: run.userId, spaceId: run.spaceId },
-            select: {
-              id: true,
-              connectorId: true,
-              provider: true,
-              providerRef: true,
-              displayName: true,
-              status: true,
-            },
-          }),
+          conversationOnly
+            ? Promise.resolve([])
+            : deps.prisma.connection.findMany({
+                where: { userId: run.userId, spaceId: run.spaceId },
+                select: {
+                  id: true,
+                  connectorId: true,
+                  provider: true,
+                  providerRef: true,
+                  displayName: true,
+                  status: true,
+                },
+              }),
           resolveMemberMainModel(deps, run),
           deps.prisma.deploymentSettings.findUnique({
             where: { id: "default" },
@@ -3894,17 +3992,21 @@ export function createRunExecutor(deps: ExecutorDeps) {
           deps.prisma.taughtSkill.findMany({
             where: { botId: run.botId, spaceId: run.spaceId, status: "saved" },
           }),
-          listAgentSkillRecords(deps.prisma, {
-            spaceId: run.spaceId,
-            userId: run.userId,
-          }),
-          deps.prisma.agentSecret.findMany({
-            where: { spaceId: run.spaceId },
-            select: {
-              name: true,
-              secret: { select: { id: true, ciphertext: true } },
-            },
-          }),
+          conversationOnly
+            ? Promise.resolve([])
+            : listAgentSkillRecords(deps.prisma, {
+                spaceId: run.spaceId,
+                userId: run.userId,
+              }),
+          conversationOnly
+            ? Promise.resolve([])
+            : deps.prisma.agentSecret.findMany({
+                where: { spaceId: run.spaceId },
+                select: {
+                  name: true,
+                  secret: { select: { id: true, ciphertext: true } },
+                },
+              }),
           loadBotCommandEnvironment(deps.prisma, deps.secretStore, run),
           loadLoginPasswordRedactions(deps.prisma, deps.secretStore, run),
         ]);
@@ -3973,6 +4075,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
           spaceId: run.spaceId,
           userId: run.userId,
           botId: bot.id,
+          conversationOnly,
+          collaborationRestricted: conversationOnly,
           runId,
           screenLeaseId: screenLeaseIdForRun(computerLease, runId, fence),
           signal: runAbortController.signal,
@@ -3980,7 +4084,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           connectedProviders: connectedComposio.map((row) => row.provider),
         };
         const memoryScope = configuredMemory
-          ? effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
+          ? conversationOnly
+            ? "isolated"
+            : effectiveMemoryScope(bot.memoryScope, configuredMemory.defaultScope)
           : null;
         const semanticMemory: SemanticMemoryProvider | null = configuredMemory?.provider ?? null;
 
@@ -3993,9 +4099,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
           payload: { trigger: run.trigger, routineId: run.routineId },
         });
 
-        const discoveredPromise = deps.connector
-          ? deps.connector.discoverTools(context)
-          : Promise.resolve([]);
+        const discoveredPromise =
+          deps.connector && !conversationOnly
+            ? deps.connector.discoverTools(context)
+            : Promise.resolve([]);
         const threadContext = threadContextForRun(
           run.trigger,
           {
@@ -4007,9 +4114,12 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 | "user"
                 | "assistant"
                 | "system",
-              content: isPartialReplyClientNonce(m.clientNonce)
-                ? `${messageToAgentHistoryText(m)}\n\n${PARTIAL_REPLY_NOTE}`
-                : messageToAgentHistoryText(m),
+              content:
+                conversationOnly && m.role === "user"
+                  ? `[From ${JSON.stringify(m.authorName ?? m.authorUserId ?? "owner")}]\n${messageToAgentHistoryText(m)}`
+                  : isPartialReplyClientNonce(m.clientNonce)
+                    ? `${messageToAgentHistoryText(m)}\n\n${PARTIAL_REPLY_NOTE}`
+                    : messageToAgentHistoryText(m),
             })),
             summary: thread.historyCompactionSummary,
             historyCompactedUpToSeq: thread.historyCompactedUpToSeq,
@@ -4090,7 +4200,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 spaceId: run.spaceId,
                 botId: bot.id,
               }),
-          messagingChannelRun || !deps.ticketBoardEnabled
+          conversationOnly || messagingChannelRun || !deps.ticketBoardEnabled
             ? Promise.resolve(undefined)
             : loadAgentTicketContext(deps, {
                 spaceId: run.spaceId,
@@ -4195,9 +4305,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
           });
         }
 
-        if (!bot.computer) throw new Error("Bot has no computer");
+        if (!bot.computer && !conversationOnly) throw new Error("Bot has no computer");
         const storedComputer = bot.computer;
-        const computerMode = parseComputerMode(storedComputer.scope);
+        if (conversationOnly && storedComputer && storedComputer.id !== leaseTarget.computerId)
+          throw new Error("Shared bot computer changed during run setup.");
+        const requireStoredComputer = () => {
+          if (!storedComputer) throw new Error("Configure a replacement dedicated computer first.");
+          return storedComputer;
+        };
+        const computerMode = parseComputerMode(storedComputer?.scope ?? "dedicated");
         const artifacts = deps.artifacts;
         const recentFilesInput = {
           context,
@@ -4207,8 +4323,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
         };
         const runComputer = lazyRunComputer(
           async () => {
+            const storedComputer = requireStoredComputer();
+            if (conversationOnly) await assertSharedAccess(storedComputer.id);
+            if (conversationOnly && (await deps.sandbox.provisionKind?.()) === "desktop")
+              throw new Error("Shared bots cannot use a host computer.");
             getLogger().info("computer.requested");
             const computer = await provisionComputer(deps, storedComputer.id, context, "bot");
+            if (conversationOnly && computer.kind === "desktop")
+              throw new Error("Shared bots cannot use a host computer.");
             screenRelease = { computer, context, keepWarm: false };
             scheduleComputerSleep(deps.jobs, storedComputer.id);
             // Earlier attachments wait for the computer's first use; every start copies them
@@ -4223,15 +4345,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
           },
           () => runAbortController?.abort(),
         );
-        const computerKind = (await deps.sandbox.provisionKind?.()) ?? storedComputer.kind;
+        const computerKind = storedComputer
+          ? ((await deps.sandbox.provisionKind?.()) ?? storedComputer.kind)
+          : undefined;
         const workspaceCheckpoint = createRunWorkspaceCheckpoint(async () => {
-          if (!runComputer.ready) return;
+          if (!storedComputer || !runComputer.ready) return;
           await checkpointRunComputerWorkspace(deps, storedComputer, runComputer.ready, context);
         }, context.signal);
         const pendingTurnFiles: MessageBlock[][] = [turnBlocks ?? []];
         let copyingTurnFiles = Promise.resolve();
         // Serialize copies before each tool, including attachments received while a boot is in flight.
         const getRunComputer = async (reason: "tool" | "takeover" | "script", tool?: string) => {
+          const storedComputer = requireStoredComputer();
+          if (conversationOnly) await assertSharedAccess(storedComputer.id);
           if (computerUseReason === "none") {
             computerUseReason = reason;
             computerUseTool = tool && BUILTIN_AGENT_TOOL_NAMES.has(tool) ? tool : undefined;
@@ -4292,7 +4418,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           .filter(Boolean)
           .join("\n\n");
         const graphical =
-          computerKind !== "desktop" && deps.sandbox.describe().capabilities.graphical;
+          Boolean(storedComputer) &&
+          computerKind !== "desktop" &&
+          deps.sandbox.describe().capabilities.graphical;
         // Gate on the model this run will actually call — the pair written to the run row
         // above. Deriving it a second time here dropped the deployment fallback, so a
         // vision-capable default was gated as "scripted" and lost its screenshot tools.
@@ -4302,12 +4430,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
           resolved.acceptsImages,
         );
         const acceptsImages = deps.runtime.describe().capabilities.scripted || modelSeesImages;
-        const groupContext = thread.groupId
-          ? await loadGroupContext(deps.prisma, thread.groupId, {
-              id: bot.id,
-              name: bot.name,
-            })
-          : undefined;
+        const groupContext =
+          !conversationOnly && thread.groupId
+            ? await loadGroupContext(deps.prisma, thread.groupId, {
+                id: bot.id,
+                name: bot.name,
+              })
+            : undefined;
         const hasMessagingIdentity = deps.messaging
           ? await deps.messaging.hasIdentity(bot.id)
           : false;
@@ -4333,13 +4462,16 @@ export function createRunExecutor(deps: ExecutorDeps) {
           (run.trigger === "user" || run.trigger === "follow_up") && run.sourceMessageId
             ? await deps.prisma.message.findUnique({
                 where: { id: run.sourceMessageId },
-                select: { clientNonce: true, role: true, blocks: true },
+                select: { clientNonce: true, role: true, blocks: true, authorUserId: true },
               })
             : null;
         // Calls carry no schema flag: the sending client encodes them in the clientNonce.
         const sourceClientNonce = sourceMessage?.clientNonce ?? null;
         // A follow-up can be queued by a bot (group handoffs); only the user's own counts.
-        const ownerStartedRun = isOwnerStartedRun(run.trigger, sourceMessage?.role === "user");
+        const ownerStartedRun =
+          (!run.requesterUserId || run.requesterUserId === run.userId) &&
+          (!sourceMessage?.authorUserId || sourceMessage.authorUserId === run.userId) &&
+          isOwnerStartedRun(run.trigger, sourceMessage?.role === "user");
         // A hang-up run has no source message: its own nonce carries the call it closes.
         const callEndRun = run.trigger === "call_end";
         const callClientNonceForRun = callEndRun ? run.clientNonce : sourceClientNonce;
@@ -4384,6 +4516,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
         );
         let approvalRulesPromise: Promise<ActionApprovalRule[]> | undefined;
         const loadApprovalRules = () => {
+          if (conversationOnly) return Promise.resolve([]);
           approvalRulesPromise ??= deps.prisma.actionApprovalRule
             .findMany({
               where: { spaceId: run.spaceId, createdByUserId: run.userId },
@@ -4404,6 +4537,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
           | Promise<{ enabled: boolean; skipApprovals: boolean }>
           | undefined;
         const loadAutoReviewPreference = () => {
+          if (conversationOnly) return Promise.resolve({ enabled: false, skipApprovals: false });
           autoReviewPreferencePromise ??= deps.prisma.actionAutoReviewPreference
             .findUnique({
               where: {
@@ -4536,8 +4670,15 @@ export function createRunExecutor(deps: ExecutorDeps) {
         };
         // The creation intro only asks what the bot is for (see selectBuiltinToolsForRun),
         // so it gets no connector tools either.
-        const tools =
+        const candidateTools =
           run.trigger === "created" ? builtins : [...builtins, ...exposedConnectorTools];
+        const tools = conversationOnly
+          ? candidateTools.filter(
+              (tool) =>
+                sharedBotToolAllowed(tool.name, tool.route) &&
+                (Boolean(storedComputer) || !SHARED_BOT_COMPUTER_TOOLS.has(tool.name)),
+            )
+          : candidateTools;
         const taskCatalogInstruction = tools.some((tool) => tool.name === "task_catalog")
           ? TASK_CATALOG_GUIDANCE
           : undefined;
@@ -4553,12 +4694,11 @@ export function createRunExecutor(deps: ExecutorDeps) {
           graphical,
           disabled: disabledBuiltinTools,
         });
-        const dockerToolInstruction = dockerComputerToolInstruction(
-          computerKind,
-          disabledBuiltinTools,
-        );
+        const dockerToolInstruction = computerKind
+          ? dockerComputerToolInstruction(computerKind, disabledBuiltinTools)
+          : undefined;
         const hostEnvironment =
-          computerKind === "desktop"
+          storedComputer && computerKind === "desktop"
             ? await deps.sandbox
                 .environment?.(
                   {
@@ -4577,16 +4717,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
         const hostInstruction = hostEnvironment
           ? `Commands run on the user's ${hostEnvironment.platform} computer with their account permissions. Home: ${JSON.stringify(hostEnvironment.home)}. Shell: ${JSON.stringify(hostEnvironment.shell)}. The shell tool executes commands with that shell. Use its native syntax, paths and installed tools; do not assume Linux or bash. Local files outside the bot workspace can be accessed through commands. App launching is available through OS commands; graphical screen control is unavailable.`
           : undefined;
-        const computerInstruction = [
-          "Use the computer only when the task needs files, commands, a browser, or an installed application. Answer directly from the conversation when sufficient; use connected tools for app data. Do not inspect the computer just to prepare for an unrelated task.",
-          hostInstruction
-            ? `${baseComputerInstruction} ${hostInstruction}`
-            : dockerToolInstruction
-              ? `${baseComputerInstruction} ${dockerToolInstruction}`
-              : baseComputerInstruction,
-        ].join(" ");
-        const workspaceInstruction =
-          computerMode === "team"
+        const computerInstruction = storedComputer
+          ? [
+              "Use the computer only when the task needs files, commands, a browser, or an installed application. Answer directly from the conversation when sufficient; use connected tools for app data. Do not inspect the computer just to prepare for an unrelated task.",
+              hostInstruction
+                ? `${baseComputerInstruction} ${hostInstruction}`
+                : dockerToolInstruction
+                  ? `${baseComputerInstruction} ${dockerToolInstruction}`
+                  : baseComputerInstruction,
+            ].join(" ")
+          : "";
+        const workspaceInstruction = !storedComputer
+          ? ""
+          : computerMode === "team"
             ? `Your Team Computer home is ${teamBotWorkspaceDirectory(bot.id)}. Relative file paths and shell working directories start there. Put intentionally shared work under shared/. Other bots' folders are visible under bots/; treat them as their working areas.`
             : "This entire computer workspace is your private home. Relative file paths and shell working directories start at its root.";
 
@@ -4685,6 +4828,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         let handedOff = false;
         let progressRedactor = createStreamingRedactor(runSecrets);
         const scripted = deps.runtime.describe().capabilities.scripted;
+        if (conversationOnly && scripted)
+          throw new Error("Shared bots require a runtime with scoped tool dispatch.");
         const script = scripted ? inferScript(task.prompt, takeoverResume?.checkpoint) : undefined;
         const flushProgress = async () => {
           // Routines may finish silently. Do not leak narration or a partial silence
@@ -4843,6 +4988,13 @@ export function createRunExecutor(deps: ExecutorDeps) {
           observer?: AgentToolExecutionObserver,
         ) => {
           context.signal.throwIfAborted();
+          if (conversationOnly) {
+            await assertSharedAccess();
+            const error = sharedBotToolError(name, args, bot.id, connectorTools.get(name)?.route);
+            if (error) return { error };
+            if (!tools.some((tool) => tool.name === name))
+              return { error: "This tool is unavailable for this shared bot." };
+          }
           if (handedOff) {
             return {
               error: "This stage was handed off. End the turn without more tool calls.",
@@ -5046,6 +5198,10 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 }
               }
             }
+          }
+          if (conversationOnly) {
+            const error = sharedBotToolError(name, args, bot.id, connectorCall.route);
+            if (error) return { error };
           }
           const fleetWrite =
             FLEET_WRITE_TOOL_NAMES_SET.has(name) ||
@@ -6201,7 +6357,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                           "rakazo-background-launch",
                           // Marker id must match sleepComputerIfIdle's probe (DB id), not ComputerRef.id
                           // (providerRef via toComputerRef). Scope launches to this run for cancel teardown.
-                          storedComputer.id,
+                          requireStoredComputer().id,
                           runId,
                           randomUUID(),
                           command,
@@ -6499,6 +6655,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
               userId: run.userId,
               ...(thread.groupId ? { threadId: thread.id } : {}),
               tools,
+              collaborationRestricted: conversationOnly,
             });
           }
           if (name === "scratchpad_list") {
@@ -6669,6 +6826,17 @@ export function createRunExecutor(deps: ExecutorDeps) {
             return finish(cancelled);
           }
           if (name === "skill_read") {
+            if (conversationOnly) {
+              const skill = sharedBotTaughtSkill(savedSkills, args);
+              return skill
+                ? {
+                    id: skill.id,
+                    name: skill.name,
+                    goal: skill.goal,
+                    playbook: parsePlaybook(skill.playbook),
+                  }
+                : { error: "Taught skill not found for this bot." };
+            }
             return skillReadFromTool(
               deps.prisma,
               {
@@ -7861,6 +8029,9 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
         }
         const prompt = [
+          conversationOnly
+            ? `This is a shared bot. Use only its bot memory, taught skills, routines, explicitly assigned credentials, and dedicated computer when attached. MCP tools are unavailable because their sessions are not bot-isolated. ${storedComputer ? "" : "No computer is attached; its owner must configure a replacement dedicated computer before computer work can resume. "}The owner configures policies and pays for execution; collaborators request work but cannot authorize configuration changes or owner-wide resources. Owner personal skills, accounts, shared memory, fleet, boards, and other bots' history are unavailable. Requester: ${JSON.stringify(messages.find((message) => message.id === run.sourceMessageId)?.authorName ?? run.requesterUserId ?? run.userId)}.`
+            : undefined,
           replyContext,
           run.trigger === "reaction" && replyContext ? undefined : basePrompt,
           takeoverResume?.promptNote,
@@ -7903,34 +8074,35 @@ export function createRunExecutor(deps: ExecutorDeps) {
           : history;
         const runtimeHistory = [...historicalContext, ...historyWithImages];
         // Without a roster a bot only knows the bots it spawned itself.
-        const botDirectory = thread.groupId
-          ? undefined
-          : renderBotDirectory(
-              (
-                await deps.prisma.bot.findMany({
-                  where: {
-                    spaceId: run.spaceId,
-                    userId: run.userId,
-                    archivedAt: null,
-                    id: { not: bot.id },
-                    thread: { isNot: null },
-                  },
-                  select: {
-                    id: true,
-                    name: true,
-                    title: true,
-                    description: true,
-                  },
-                  orderBy: { createdAt: "asc" },
-                  take: BOT_DIRECTORY_LIMIT,
-                })
-              ).map((peer) => ({
-                id: peer.id,
-                name: peer.name,
-                title: peer.title,
-                description: peer.description,
-              })),
-            );
+        const botDirectory =
+          conversationOnly || thread.groupId
+            ? undefined
+            : renderBotDirectory(
+                (
+                  await deps.prisma.bot.findMany({
+                    where: {
+                      spaceId: run.spaceId,
+                      userId: run.userId,
+                      archivedAt: null,
+                      id: { not: bot.id },
+                      thread: { isNot: null },
+                    },
+                    select: {
+                      id: true,
+                      name: true,
+                      title: true,
+                      description: true,
+                    },
+                    orderBy: { createdAt: "asc" },
+                    take: BOT_DIRECTORY_LIMIT,
+                  })
+                ).map((peer) => ({
+                  id: peer.id,
+                  name: peer.name,
+                  title: peer.title,
+                  description: peer.description,
+                })),
+              );
 
         if (heldForTakeover) {
           const releasedCheckpoint = takeoverCheckpointOf(
@@ -7995,6 +8167,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
 
         try {
           if (checkpointLoadError) throw checkpointLoadError;
+          if (conversationOnly) await assertSharedAccess();
           const runtimeEvents = deps.runtime.run(
             {
               botId: bot.id,
@@ -8352,7 +8525,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 pendingProgress = "";
               }
               // Give the user a full idle period to answer before the computer may suspend.
-              scheduleComputerSleep(deps.jobs, storedComputer.id);
+              scheduleComputerSleep(deps.jobs, requireStoredComputer().id);
               await publishMessage(
                 deps,
                 run,
@@ -8375,7 +8548,7 @@ export function createRunExecutor(deps: ExecutorDeps) {
                 leaseOwner: workerId,
                 leaseFence: fence,
                 reason: safeReason,
-                computerId: storedComputer.id,
+                computerId: requireStoredComputer().id,
               });
               if (!paused) return;
               retainComputerLease = true;
@@ -8876,7 +9049,8 @@ export function createRunExecutor(deps: ExecutorDeps) {
         // setup that fails every time would retry forever. End the run instead.
         if (
           !retryForever &&
-          (await setupFailureStreak(deps.prisma, runId)) >= RUN_SETUP_FAILURE_LIMIT - 1
+          ((conversationOnly && deps.runtime.describe().capabilities.scripted) ||
+            (await setupFailureStreak(deps.prisma, runId)) >= RUN_SETUP_FAILURE_LIMIT - 1)
         ) {
           const bot = await deps.prisma.bot.findUnique({
             where: { id: run.botId },
@@ -10693,6 +10867,7 @@ export async function loadCurrentTurnImages(
     botId: string;
     runId: string;
     signal: AbortSignal;
+    conversationOnly?: boolean;
   },
 ) {
   if (!deps.artifacts || !blocks?.length) return undefined;
@@ -10705,7 +10880,7 @@ export async function loadCurrentTurnImages(
     where: {
       id: { in: imageBlocks.map((block) => block.artifactId) },
       spaceId: context.spaceId,
-      userId: context.userId,
+      ...conversationAttachmentWhere(context),
     },
   });
   const byId = new Map(rows.map((row) => [row.id, row]));
@@ -10759,6 +10934,7 @@ async function loadTurnImagesWithinBudget(
     botId: string;
     runId: string;
     signal: AbortSignal;
+    conversationOnly?: boolean;
   },
   budget: { remainingBytes: number; remainingImages: number },
 ): Promise<{
@@ -10786,7 +10962,7 @@ async function loadTurnImagesWithinBudget(
     where: {
       id: { in: imageBlocks.map((block) => block.artifactId) },
       spaceId: context.spaceId,
-      userId: context.userId,
+      ...conversationAttachmentWhere(context),
     },
     select: { id: true, storageKey: true, size: true },
   });

@@ -51,6 +51,7 @@ import { rpc } from "../../lib/rpc";
 import { errorText } from "../../lib/user-error";
 import { AvatarStudioPopover } from "./avatar-studio-popover";
 import { BotCredentialsSection } from "./bot-credentials";
+import { BotSharing } from "./bot-sharing";
 import { ChatModelPicker } from "./chat-model-picker";
 
 const ScratchpadSection = lazyComponent(() =>
@@ -98,10 +99,14 @@ export function BotSettings({
   onClear,
   focusModel = 0,
   onOpenConnections,
+  onSharingChanged,
+  onOpenCompany,
 }: {
   bot: Bot;
   focusModel?: number;
   onOpenConnections?: () => void;
+  onSharingChanged?: (transferred?: boolean) => Promise<void>;
+  onOpenCompany?: () => void;
   onSkillsChange: (skills: AgentSkillCatalogEntry[]) => void;
   memoryProviderConfigured: boolean;
   onSave: (patch: {
@@ -125,6 +130,70 @@ export function BotSettings({
   onExport: () => Promise<void>;
   onClear: () => void;
 }) {
+  if (bot.accessRole === "collaborator") {
+    return <SharedBotPreferences bot={bot} onSave={onSave} />;
+  }
+  return (
+    <OwnedBotSettings
+      bot={bot}
+      memoryProviderConfigured={memoryProviderConfigured}
+      onSkillsChange={onSkillsChange}
+      onSave={onSave}
+      onExport={onExport}
+      onClear={onClear}
+      focusModel={focusModel}
+      onOpenConnections={onOpenConnections}
+      onSharingChanged={onSharingChanged}
+      onOpenCompany={onOpenCompany}
+    />
+  );
+}
+
+function SharedBotPreferences({
+  bot,
+  onSave,
+}: Pick<Parameters<typeof BotSettings>[0], "bot" | "onSave">) {
+  const { t } = useLingui();
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  return (
+    <div data-testid="bot-settings">
+      <div className="flex items-center justify-between gap-3">
+        <Trans>Notifications</Trans>
+        <Switch
+          aria-label={t`Notifications`}
+          checked={bot.notifyOnFinish ?? true}
+          disabled={saving}
+          onCheckedChange={(notifyOnFinish) => {
+            setSaving(true);
+            setError(null);
+            void onSave({ notifyOnFinish })
+              .catch((cause) => setError(errorText(cause, t`Could not save`)))
+              .finally(() => setSaving(false));
+          }}
+        />
+      </div>
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function OwnedBotSettings({
+  bot,
+  memoryProviderConfigured,
+  onSkillsChange,
+  onSave,
+  onExport,
+  onClear,
+  focusModel = 0,
+  onOpenConnections,
+  onSharingChanged,
+  onOpenCompany,
+}: Parameters<typeof BotSettings>[0]) {
   const { t } = useLingui();
   const ids = useId();
   const [advancedOpen, setAdvancedOpen] = useState(Boolean(focusModel));
@@ -157,6 +226,17 @@ export function BotSettings({
   const automaticRevision = useRef({ color: 0, notifyOnFinish: 0 });
   const [computerMode, setComputerMode] = useState(bot.computerMode);
   const [memoryScope, setMemoryScope] = useState(bot.memoryScope);
+  useEffect(() => {
+    if (!bot.collaborationRestricted) return;
+    setMemoryScope("isolated");
+    setComputerMode("dedicated");
+    setSavedAdvanced((saved) => {
+      const values = JSON.parse(saved) as unknown[];
+      values[2] = "dedicated";
+      values[3] = "isolated";
+      return JSON.stringify(values);
+    });
+  }, [bot.collaborationRestricted]);
   const [autoSpeak, setAutoSpeak] = useState(bot.autoSpeak);
   const [crossSpaceCommunication, setCrossSpaceCommunication] = useState(
     bot.crossSpaceCommunication ?? false,
@@ -531,6 +611,21 @@ export function BotSettings({
           />
         </div>
       </section>
+      <BotSharing
+        botId={bot.id}
+        onOpenCompany={onOpenCompany}
+        computerMode={bot.computerMode}
+        onUsePrivateComputer={async () => {
+          await onSave({ computerMode: "dedicated" });
+          setComputerMode("dedicated");
+          setSavedAdvanced((saved) => {
+            const values = JSON.parse(saved) as unknown[];
+            values[2] = "dedicated";
+            return JSON.stringify(values);
+          });
+        }}
+        onChanged={onSharingChanged ?? (async () => undefined)}
+      />
       <ErrorBoundary fallback={<SectionLoadFailed />}>
         <Suspense fallback={null}>
           <ScratchpadSection botId={bot.id} />
@@ -614,36 +709,38 @@ export function BotSettings({
                 ) : null}
               </div>
             </div>
-            <SettingsGroup label={t`Computer`}>
-              <ComputerModePicker value={computerMode} onChange={setComputerMode} />
-              {memoryProviderConfigured ? (
-                <div className="mt-4 text-sm text-foreground">
-                  <Trans>Memory scope</Trans>
-                  <div className="mt-2 flex gap-2">
-                    {(
-                      [
-                        { value: null, label: t`Inherit default` },
-                        { value: "isolated" as const, label: t`Isolated` },
-                        { value: "shared" as const, label: t`Shared` },
-                      ] satisfies Array<{ value: "isolated" | "shared" | null; label: string }>
-                    ).map((option) => (
-                      <Toggle
-                        key={option.label}
-                        variant="outline"
-                        size="sm"
-                        pressed={memoryScope === option.value}
-                        onPressedChange={(pressed) => {
-                          if (pressed) setMemoryScope(option.value);
-                        }}
-                        className="flex-1 aria-pressed:border-foreground/40 aria-pressed:text-foreground"
-                      >
-                        {option.label}
-                      </Toggle>
-                    ))}
+            {!bot.collaborationRestricted ? (
+              <SettingsGroup label={t`Computer`}>
+                <ComputerModePicker value={computerMode} onChange={setComputerMode} />
+                {memoryProviderConfigured ? (
+                  <div className="mt-4 text-sm text-foreground">
+                    <Trans>Memory scope</Trans>
+                    <div className="mt-2 flex gap-2">
+                      {(
+                        [
+                          { value: null, label: t`Inherit default` },
+                          { value: "isolated" as const, label: t`Isolated` },
+                          { value: "shared" as const, label: t`Shared` },
+                        ] satisfies Array<{ value: "isolated" | "shared" | null; label: string }>
+                      ).map((option) => (
+                        <Toggle
+                          key={option.label}
+                          variant="outline"
+                          size="sm"
+                          pressed={memoryScope === option.value}
+                          onPressedChange={(pressed) => {
+                            if (pressed) setMemoryScope(option.value);
+                          }}
+                          className="flex-1 aria-pressed:border-foreground/40 aria-pressed:text-foreground"
+                        >
+                          {option.label}
+                        </Toggle>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ) : null}
-            </SettingsGroup>
+                ) : null}
+              </SettingsGroup>
+            ) : null}
             <SettingsGroup label={t`Voice`}>
               <label
                 htmlFor={`${ids}-auto-speak`}
@@ -680,41 +777,43 @@ export function BotSettings({
                 </label>
               ) : null}
             </SettingsGroup>
-            <SettingsGroup label={t`Permissions`}>
-              <div className="flex min-h-11 items-center justify-between gap-3 text-sm">
-                <label htmlFor={`${ids}-cross-space`} className={rowLabelClass}>
-                  <Trans>Allow cross-space bot communication</Trans>
-                </label>
-                <Switch
-                  id={`${ids}-cross-space`}
-                  checked={crossSpaceCommunication}
-                  disabled={saving}
-                  onCheckedChange={(checked) => {
-                    setCrossSpaceCommunication(checked);
-                    void enqueueSave({ crossSpaceCommunication: checked });
-                  }}
-                />
-              </div>
-              <div className="flex min-h-11 items-center justify-between gap-3 text-sm">
-                <div>
-                  <label htmlFor={`${ids}-fleet-management`} className={rowLabelClass}>
-                    <Trans>Manage the bots it creates</Trans>
+            {!bot.collaborationRestricted ? (
+              <SettingsGroup label={t`Permissions`}>
+                <div className="flex min-h-11 items-center justify-between gap-3 text-sm">
+                  <label htmlFor={`${ids}-cross-space`} className={rowLabelClass}>
+                    <Trans>Allow cross-space bot communication</Trans>
                   </label>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    <Trans>Can edit and organise bots it creates</Trans>
-                  </p>
+                  <Switch
+                    id={`${ids}-cross-space`}
+                    checked={crossSpaceCommunication}
+                    disabled={saving}
+                    onCheckedChange={(checked) => {
+                      setCrossSpaceCommunication(checked);
+                      void enqueueSave({ crossSpaceCommunication: checked });
+                    }}
+                  />
                 </div>
-                <Switch
-                  id={`${ids}-fleet-management`}
-                  checked={fleetManagement}
-                  disabled={saving}
-                  onCheckedChange={(checked) => {
-                    setFleetManagement(checked);
-                    void enqueueSave({ fleetManagement: checked });
-                  }}
-                />
-              </div>
-            </SettingsGroup>
+                <div className="flex min-h-11 items-center justify-between gap-3 text-sm">
+                  <div>
+                    <label htmlFor={`${ids}-fleet-management`} className={rowLabelClass}>
+                      <Trans>Manage the bots it creates</Trans>
+                    </label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      <Trans>Can edit and organise bots it creates</Trans>
+                    </p>
+                  </div>
+                  <Switch
+                    id={`${ids}-fleet-management`}
+                    checked={fleetManagement}
+                    disabled={saving}
+                    onCheckedChange={(checked) => {
+                      setFleetManagement(checked);
+                      void enqueueSave({ fleetManagement: checked });
+                    }}
+                  />
+                </div>
+              </SettingsGroup>
+            ) : null}
             <SettingsGroup label={t`Description`}>
               <label htmlFor={`${ids}-description`} className="block text-xs text-muted-foreground">
                 <Trans>How other bots see it</Trans>
@@ -731,58 +830,64 @@ export function BotSettings({
                 />
               </label>
             </SettingsGroup>
-            <SettingsGroup label={t`Tools`}>
-              <section data-testid="bot-settings-tools">
-                <div className="space-y-4 [&>*]:mt-0">
-                  <div>
-                    <NativeSelect
-                      id={`${ids}-disabled-tools`}
-                      aria-label={t`Disable a tool`}
-                      value=""
-                      onChange={(event) => disableBuiltinTool(event.target.value)}
-                      className="w-full"
-                    >
-                      <NativeSelectOption value="">{t`Disable a tool`}</NativeSelectOption>
-                      {BUILTIN_TOOL_NAMES.filter(
-                        (name) => !disabledBuiltinTools.includes(name),
-                      ).map((name) => (
-                        <NativeSelectOption key={name} value={name}>
-                          {humanizeTool(name)}
-                        </NativeSelectOption>
+            {!bot.collaborationRestricted ? (
+              <>
+                <SettingsGroup label={t`Tools`}>
+                  <section data-testid="bot-settings-tools">
+                    <div className="space-y-4 [&>*]:mt-0">
+                      <div>
+                        <NativeSelect
+                          id={`${ids}-disabled-tools`}
+                          aria-label={t`Disable a tool`}
+                          value=""
+                          onChange={(event) => disableBuiltinTool(event.target.value)}
+                          className="w-full"
+                        >
+                          <NativeSelectOption value="">{t`Disable a tool`}</NativeSelectOption>
+                          {BUILTIN_TOOL_NAMES.filter(
+                            (name) => !disabledBuiltinTools.includes(name),
+                          ).map((name) => (
+                            <NativeSelectOption key={name} value={name}>
+                              {humanizeTool(name)}
+                            </NativeSelectOption>
+                          ))}
+                        </NativeSelect>
+                      </div>
+                      {disabledBuiltinTools.map((toolName) => (
+                        <div
+                          key={toolName}
+                          className="flex min-h-11 items-center justify-between gap-3 text-sm"
+                        >
+                          <span>{humanizeTool(toolName)}</span>
+                          <Button
+                            id={`${ids}-disabled-${toolName}`}
+                            variant="ghost"
+                            size="icon-xs"
+                            aria-label={t`Enable ${humanizeTool(toolName)}`}
+                            title={t`Enable ${humanizeTool(toolName)}`}
+                            onClick={() => {
+                              const next = disabledBuiltinTools.filter(
+                                (entry) => entry !== toolName,
+                              );
+                              setDisabledBuiltinTools(next);
+                              void enqueueSave({ disabledBuiltinTools: next });
+                            }}
+                          >
+                            <X className="size-4" />
+                          </Button>
+                        </div>
                       ))}
-                    </NativeSelect>
-                  </div>
-                  {disabledBuiltinTools.map((toolName) => (
-                    <div
-                      key={toolName}
-                      className="flex min-h-11 items-center justify-between gap-3 text-sm"
-                    >
-                      <span>{humanizeTool(toolName)}</span>
-                      <Button
-                        id={`${ids}-disabled-${toolName}`}
-                        variant="ghost"
-                        size="icon-xs"
-                        aria-label={t`Enable ${humanizeTool(toolName)}`}
-                        title={t`Enable ${humanizeTool(toolName)}`}
-                        onClick={() => {
-                          const next = disabledBuiltinTools.filter((entry) => entry !== toolName);
-                          setDisabledBuiltinTools(next);
-                          void enqueueSave({ disabledBuiltinTools: next });
-                        }}
-                      >
-                        <X className="size-4" />
-                      </Button>
                     </div>
-                  ))}
-                </div>
-              </section>
-            </SettingsGroup>
-            <BotCredentialsSection botId={bot.id} />
-            <ErrorBoundary fallback={<SectionLoadFailed />}>
-              <Suspense fallback={null}>
-                <KnowledgeSection botId={bot.id} onSkillsChange={onSkillsChange} skillsOnly />
-              </Suspense>
-            </ErrorBoundary>
+                  </section>
+                </SettingsGroup>
+                <BotCredentialsSection botId={bot.id} />
+                <ErrorBoundary fallback={<SectionLoadFailed />}>
+                  <Suspense fallback={null}>
+                    <KnowledgeSection botId={bot.id} onSkillsChange={onSkillsChange} skillsOnly />
+                  </Suspense>
+                </ErrorBoundary>
+              </>
+            ) : null}
             <div className="overflow-hidden rounded-xl bg-muted/50 px-4">
               <button
                 type="button"

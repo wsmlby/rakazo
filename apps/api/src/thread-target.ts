@@ -34,6 +34,7 @@ import {
   createThreadMessageInTransaction,
   deleteRunSecretsInTransaction,
   expireComputerExecutionLeases,
+  getAccessibleBot,
   IsolationError,
   lockOwnedGroup,
   primaryActiveRun,
@@ -297,7 +298,7 @@ export async function resolveThreadTarget(
   const repos = createRepos(prisma);
   const groupRepos = createGroupRepos(prisma);
   if (input.botId) {
-    const bot = await repos.getBot(actor, input.botId, options);
+    const bot = await repos.getAccessibleBot(actor, input.botId, options);
     if (!bot.thread) throw new IsolationError();
     return {
       kind: "bot",
@@ -590,6 +591,7 @@ function messagesWithLiveEvents(
 function mapRun(run: {
   id: string;
   userId: string;
+  requesterUserId?: string | null;
   botId: string;
   threadId: string;
   taskId: string;
@@ -606,6 +608,7 @@ function mapRun(run: {
   return {
     id: run.id,
     userId: run.userId,
+    requesterUserId: run.requesterUserId ?? run.userId,
     botId: run.botId,
     threadId: run.threadId,
     taskId: run.taskId,
@@ -643,6 +646,9 @@ export async function sendThreadMessage(
   },
   releaseTakeover?: (runId: string) => Promise<void>,
 ) {
+  if (target.kind === "bot" && target.bot?.collaborationRestricted) {
+    return sendSharedBotMessage(deps, actor, target, input);
+  }
   const existing = await replayExistingSend(
     deps,
     target.threadId,
@@ -656,6 +662,128 @@ export async function sendThreadMessage(
   const requestedReplyQuote = input.replyQuote?.trim() || undefined;
   if (requestedReplyQuote && !input.replyToMessageId) {
     throw new ORPCError("BAD_REQUEST", { message: "replyQuote requires replyToMessageId." });
+  }
+
+  async function sendSharedBotMessage(
+    deps: { prisma: PrismaClient; events: ThreadEvents; jobs: JobPublisher },
+    actor: Actor,
+    target: Extract<ThreadTarget, { kind: "bot" }>,
+    input: {
+      text?: string;
+      artifactIds?: string[];
+      mentions?: MentionTargetInput[];
+      replyToMessageId?: string;
+      replyQuote?: string;
+      clientNonce?: string;
+    },
+  ) {
+    if (input.mentions?.some((item) => typeof item !== "string" && item.kind === "connector"))
+      throw new ORPCError("FORBIDDEN", { message: "Shared bots cannot use account connections" });
+    const committed = await deps.prisma.$transaction(async (tx) => {
+      // Serialize authorization, revocation, input creation and the shared queue.
+      await tx.$queryRaw`SELECT id FROM threads WHERE id = ${target.threadId} FOR UPDATE`;
+      const bot = await getAccessibleBot(tx, actor, target.botId);
+      if (!bot.collaborationRestricted) throw new IsolationError();
+      if (input.clientNonce) {
+        const previous = await tx.message.findUnique({
+          where: {
+            threadId_clientNonce: { threadId: target.threadId, clientNonce: input.clientNonce },
+          },
+          include: { sourceRuns: true },
+        });
+        if (previous) {
+          if (previous.authorUserId !== actor.userId || !previous.sourceRuns[0])
+            throw new IsolationError();
+          return { message: previous, run: previous.sourceRuns[0], eventSeq: null };
+        }
+      }
+      const author = await tx.user.findUniqueOrThrow({
+        where: { id: actor.userId },
+        select: { name: true },
+      });
+      const { blocks: attachments, artifacts } = await resolveSendAttachments(
+        { prisma: tx },
+        actor,
+        bot.id,
+        input.artifactIds,
+      );
+      let replyToMessageId: string | undefined;
+      let quote: string | undefined;
+      if (input.replyToMessageId) {
+        const reply = await tx.message.findFirst({
+          where: { id: input.replyToMessageId, threadId: target.threadId },
+        });
+        if (reply) {
+          replyToMessageId = reply.id;
+          const blocks = MessageBlockSchema.array().parse(reply.blocks);
+          if (input.replyQuote)
+            quote = deriveMessageQuote(
+              blocks,
+              input.replyQuote,
+              reply.role === "user" ? "plain-text" : "markdown",
+            );
+        }
+      }
+      const blocks = buildUserMessageBlocks(input.text, attachments);
+      const message = await createThreadMessageInTransaction(tx, {
+        threadId: target.threadId,
+        role: "user",
+        blocks,
+        authorUserId: actor.userId,
+        authorName: author.name,
+        replyToMessageId,
+        replyQuote: quote,
+        clientNonce: input.clientNonce,
+      });
+      const task = await tx.task.create({
+        data: {
+          spaceId: actor.spaceId,
+          botId: bot.id,
+          threadId: target.threadId,
+          userId: bot.userId,
+          requesterUserId: actor.userId,
+          prompt: buildSendPrompt(input.text, artifacts, []),
+          status: "queued",
+        },
+      });
+      const run = await tx.run.create({
+        data: {
+          spaceId: actor.spaceId,
+          botId: bot.id,
+          threadId: target.threadId,
+          taskId: task.id,
+          userId: bot.userId,
+          requesterUserId: actor.userId,
+          status: "queued",
+          trigger: "user",
+          sourceMessageId: message.id,
+          clientNonce: sendRunClientNonce(input.clientNonce, message.id),
+        },
+      });
+      await tx.message.update({ where: { id: message.id }, data: { runId: run.id } });
+      const event = await appendEventInTransaction(tx, {
+        spaceId: actor.spaceId,
+        botId: bot.id,
+        threadId: target.threadId,
+        type: "thread.message.created",
+        runId: run.id,
+        payload: {
+          messageId: message.id,
+          seq: message.seq,
+          role: "user",
+          blocks,
+          authorUserId: actor.userId,
+          authorName: author.name,
+          replyToMessageId,
+          replyQuote: quote,
+          runIds: [run.id],
+        },
+      });
+      return { message, run, eventSeq: event.seq };
+    });
+    if (committed.eventSeq !== null) await deps.events.notify(target.threadId, committed.eventSeq);
+    await enqueueRunsNeedingContinue(deps.jobs, [committed.run]);
+    return sendResult(committed.message, [committed.run]);
   }
 
   const commit = () =>
@@ -1272,24 +1400,41 @@ export async function stopThreadRuns(
   },
   actor: Actor,
   target: ThreadTarget,
+  runId?: string,
 ) {
   const { runIds, computers, leases, eventSeq } = await deps.prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM threads WHERE id = ${target.threadId} FOR UPDATE`;
+    const currentBot =
+      target.kind === "bot" && target.bot?.collaborationRestricted
+        ? await getAccessibleBot(tx, actor, target.botId)
+        : null;
+    const collaborator = Boolean(currentBot && currentBot.userId !== actor.userId);
     const cancelled = await tx.run.updateManyAndReturn({
       where: {
         threadId: target.threadId,
+        ...(runId ? { id: runId } : {}),
         status: { in: [...ACTIVE_RUN_STATUSES] },
+        ...(collaborator ? { requesterUserId: actor.userId, status: "queued" } : {}),
       },
       data: { status: "cancelled", completedAt: new Date() },
       select: { id: true, botId: true, userId: true, spaceId: true },
     });
+    if (runId && cancelled.length !== 1) throw new IsolationError();
     const ids = cancelled.map((run) => run.id);
+    if (collaborator) {
+      await tx.task.updateMany({
+        where: { runs: { some: { id: { in: ids } } } },
+        data: { status: "cancelled" },
+      });
+    }
     await clearRunTurnCheckpoints(tx, ids);
     await deleteRunSecretsInTransaction(tx, cancelled);
     await tx.steeringMessage.deleteMany({
       where: {
         botId: { in: target.kind === "bot" ? [target.botId] : target.memberBotIds },
         message: { threadId: target.threadId },
+        ...(runId ? { runId } : {}),
+        ...(collaborator ? { userId: actor.userId, claimedAt: null } : {}),
       },
     });
     // Snapshot teardown coordinates before commit. Once cancellation becomes
@@ -1437,6 +1582,29 @@ export async function markThreadRead(
   actor: Actor,
   target: ThreadTarget,
 ): Promise<number | null> {
+  if (target.kind === "bot" && target.bot.collaborationRestricted) {
+    return prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM threads WHERE id = ${target.threadId} FOR UPDATE`;
+      await getAccessibleBot(tx, actor, target.botId);
+      const thread = await tx.thread.findUniqueOrThrow({ where: { id: target.threadId } });
+      const previous = await tx.botUserPreference.findUnique({
+        where: { botId_userId: { botId: target.botId, userId: actor.userId } },
+      });
+      const lastReadSeq =
+        previous?.lastReadSeq ?? (target.bot.userId === actor.userId ? thread.lastReadSeq : -1);
+      await tx.botUserPreference.upsert({
+        where: { botId_userId: { botId: target.botId, userId: actor.userId } },
+        create: {
+          botId: target.botId,
+          userId: actor.userId,
+          spaceId: actor.spaceId,
+          lastReadSeq: thread.nextMessageSeq - 1,
+        },
+        update: { lastReadSeq: thread.nextMessageSeq - 1, manualUnread: false },
+      });
+      return lastReadSeq < thread.nextMessageSeq - 1 ? lastReadSeq : null;
+    });
+  }
   const where = { id: target.threadId, spaceId: actor.spaceId, userId: actor.userId };
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const thread = await prisma.thread.findFirst({
@@ -1492,6 +1660,20 @@ export async function markThreadUnreadFrom(
     select: { seq: true },
   });
   if (!message) throw new ORPCError("NOT_FOUND");
+  if (target.kind === "bot" && target.bot.collaborationRestricted) {
+    await prisma.botUserPreference.upsert({
+      where: { botId_userId: { botId: target.botId, userId: actor.userId } },
+      create: {
+        botId: target.botId,
+        userId: actor.userId,
+        spaceId: actor.spaceId,
+        lastReadSeq: message.seq - 1,
+        manualUnread: true,
+      },
+      update: { lastReadSeq: message.seq - 1, manualUnread: true },
+    });
+    return;
+  }
   const result = await prisma.thread.updateMany({
     where: { id: target.threadId, spaceId: actor.spaceId, userId: actor.userId },
     data: { unread: true, lastReadSeq: message.seq - 1 },
@@ -1505,6 +1687,19 @@ export async function setThreadUnreadState(
   target: ThreadTarget,
   unread: boolean,
 ) {
+  if (target.kind === "bot" && target.bot.collaborationRestricted) {
+    await prisma.botUserPreference.upsert({
+      where: { botId_userId: { botId: target.botId, userId: actor.userId } },
+      create: {
+        botId: target.botId,
+        userId: actor.userId,
+        spaceId: actor.spaceId,
+        manualUnread: unread,
+      },
+      update: { manualUnread: unread },
+    });
+    return;
+  }
   const result = await prisma.thread.updateMany({
     where: {
       id: target.threadId,

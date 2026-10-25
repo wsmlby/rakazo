@@ -10,7 +10,12 @@ const actor = {
   email: "fixture@example.test",
   isDeploymentOwner: false,
 } satisfies Actor;
-const target = { kind: "bot", botId: "bot-1", threadId: "thread-1" } as ThreadTarget;
+const target = {
+  kind: "bot",
+  botId: "bot-1",
+  threadId: "thread-1",
+  bot: { collaborationRestricted: false },
+} as ThreadTarget;
 
 type Row = { unread: boolean; lastReadSeq: number; nextMessageSeq: number };
 

@@ -1,0 +1,55 @@
+__vite_ssr_exportName__("BOT_AVATAR_SHAPE_COUNT", () => { try { return BOT_AVATAR_SHAPE_COUNT } catch {} });
+__vite_ssr_exportName__("BOT_AVATAR_VALUE_MAX_LENGTH", () => { try { return BOT_AVATAR_VALUE_MAX_LENGTH } catch {} });
+__vite_ssr_exportName__("parseBotAvatarValue", () => { try { return parseBotAvatarValue } catch {} });
+__vite_ssr_exportName__("isBotAvatarValue", () => { try { return isBotAvatarValue } catch {} });
+__vite_ssr_exportName__("BotAvatarValueSchema", () => { try { return BotAvatarValueSchema } catch {} });
+const __vite_ssr_import_0__ = await __vite_ssr_import__("/node_modules/.pnpm/zod@4.6.7/node_modules/zod/index.js");
+
+/** Matches the eight shipped mascot shapes in `@rakazo/core`. */
+const BOT_AVATAR_SHAPE_COUNT = 8;
+/**
+* 256x256 webp data URLs from Avatar Studio stay well under this. Cap writes so
+* a pasted raw photo cannot bloat every bot list payload.
+*/
+const BOT_AVATAR_VALUE_MAX_LENGTH = 2e5;
+const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const SHAPE_SUFFIX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})::shape_\d+$/;
+const DATA_IMAGE = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/;
+function parseBotAvatarValue(raw) {
+	if (raw.startsWith("data:image/")) {
+		return {
+			kind: "image",
+			imageUrl: raw
+		};
+	};
+	if (raw.includes("::shape_")) {
+		const parts = raw.split("::shape_");
+		const color = parts[0] || "#F97316";
+		const rawShape = parts[1] ?? "0";
+		const parsedShape = /^\d+$/.test(rawShape) ? Number(rawShape) : 0;
+		const shapeIndex = Number.isSafeInteger(parsedShape) ? parsedShape % BOT_AVATAR_SHAPE_COUNT : 0;
+		return {
+			kind: "shape",
+			color,
+			shapeIndex
+		};
+	};
+	if (HEX_COLOR.test(raw)) return {
+		kind: "color",
+		color: raw
+	};
+	return {
+		kind: "other",
+		raw
+	};
+};
+/** True for values we persist on `bots.color` (hex, encoded shape, or data image). */
+function isBotAvatarValue(raw) {
+	if (!raw || raw.length > BOT_AVATAR_VALUE_MAX_LENGTH) return false;
+	return HEX_COLOR.test(raw) || SHAPE_SUFFIX.test(raw) || DATA_IMAGE.test(raw);
+};
+const BotAvatarValueSchema = __vite_ssr_import_0__.string().min(1).max(BOT_AVATAR_VALUE_MAX_LENGTH).refine(isBotAvatarValue, { message: "Invalid bot avatar" });
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7Ozs7QUFBQTs7O0FBR08sTUFBTSx5QkFBeUI7Ozs7O0FBTS9CLE1BQU0sOEJBQThCO0FBRTNDLE1BQU0sWUFBWTtBQUNsQixNQUFNLGVBQWU7QUFDckIsTUFBTSxhQUFhO0FBUVosU0FBUyxvQkFBb0IsS0FBOEI7Q0FDaEUsSUFBSSxJQUFJLFdBQVcsYUFBYSxHQUFHO0VBQ2pDLE9BQU87R0FBRSxNQUFNO0dBQVMsVUFBVTtFQUFJO0NBQ3hDO0NBQ0EsSUFBSSxJQUFJLFNBQVMsVUFBVSxHQUFHO0VBQzVCLE1BQU0sUUFBUSxJQUFJLE1BQU0sVUFBVTtFQUNsQyxNQUFNLFFBQVEsTUFBTSxNQUFNO0VBQzFCLE1BQU0sV0FBVyxNQUFNLE1BQU07RUFDN0IsTUFBTSxjQUFjLFFBQVEsS0FBSyxRQUFRLElBQUksT0FBTyxRQUFRLElBQUk7RUFDaEUsTUFBTSxhQUFhLE9BQU8sY0FBYyxXQUFXLElBQUksY0FBYyx5QkFBeUI7RUFDOUYsT0FBTztHQUFFLE1BQU07R0FBUztHQUFPO0VBQVc7Q0FDNUM7Q0FDQSxJQUFJLFVBQVUsS0FBSyxHQUFHLEdBQUcsT0FBTztFQUFFLE1BQU07RUFBUyxPQUFPO0NBQUk7Q0FDNUQsT0FBTztFQUFFLE1BQU07RUFBUztDQUFJO0FBQzlCOztBQUdPLFNBQVMsaUJBQWlCLEtBQXNCO0NBQ3JELElBQUksQ0FBQyxPQUFPLElBQUksU0FBUyw2QkFBNkIsT0FBTztDQUM3RCxPQUFPLFVBQVUsS0FBSyxHQUFHLEtBQUssYUFBYSxLQUFLLEdBQUcsS0FBSyxXQUFXLEtBQUssR0FBRztBQUM3RTtBQUVPLE1BQU0sdUJBQXVCLHNCQUNqQyxPQUFPLENBQUMsQ0FDUixJQUFJLENBQUMsQ0FBQyxDQUNOLElBQUksMkJBQTJCLENBQUMsQ0FDaEMsT0FBTyxrQkFBa0IsRUFBRSxTQUFTLHFCQUFxQixDQUFDIiwibmFtZXMiOltdLCJpZ25vcmVMaXN0IjpbXSwic291cmNlcyI6WyJib3QtYXZhdGFyLnRzIl0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCAqIGFzIHogZnJvbSBcInpvZFwiO1xuXG4vKiogTWF0Y2hlcyB0aGUgZWlnaHQgc2hpcHBlZCBtYXNjb3Qgc2hhcGVzIGluIGBAcmFrYXpvL2NvcmVgLiAqL1xuZXhwb3J0IGNvbnN0IEJPVF9BVkFUQVJfU0hBUEVfQ09VTlQgPSA4O1xuXG4vKipcbiAqIDI1NngyNTYgd2VicCBkYXRhIFVSTHMgZnJvbSBBdmF0YXIgU3R1ZGlvIHN0YXkgd2VsbCB1bmRlciB0aGlzLiBDYXAgd3JpdGVzIHNvXG4gKiBhIHBhc3RlZCByYXcgcGhvdG8gY2Fubm90IGJsb2F0IGV2ZXJ5IGJvdCBsaXN0IHBheWxvYWQuXG4gKi9cbmV4cG9ydCBjb25zdCBCT1RfQVZBVEFSX1ZBTFVFX01BWF9MRU5HVEggPSAyMDBfMDAwO1xuXG5jb25zdCBIRVhfQ09MT1IgPSAvXiMoPzpbMC05YS1mQS1GXXszfXxbMC05YS1mQS1GXXs2fSkkLztcbmNvbnN0IFNIQVBFX1NVRkZJWCA9IC9eIyg/OlswLTlhLWZBLUZdezN9fFswLTlhLWZBLUZdezZ9KTo6c2hhcGVfXFxkKyQvO1xuY29uc3QgREFUQV9JTUFHRSA9IC9eZGF0YTppbWFnZVxcLyg/OnBuZ3xqcGVnfHdlYnB8Z2lmKTtiYXNlNjQsW0EtWmEtejAtOSsvXSs9ezAsMn0kLztcblxuZXhwb3J0IHR5cGUgUGFyc2VkQm90QXZhdGFyID1cbiAgfCB7IGtpbmQ6IFwiaW1hZ2VcIjsgaW1hZ2VVcmw6IHN0cmluZyB9XG4gIHwgeyBraW5kOiBcInNoYXBlXCI7IGNvbG9yOiBzdHJpbmc7IHNoYXBlSW5kZXg6IG51bWJlciB9XG4gIHwgeyBraW5kOiBcImNvbG9yXCI7IGNvbG9yOiBzdHJpbmcgfVxuICB8IHsga2luZDogXCJvdGhlclwiOyByYXc6IHN0cmluZyB9O1xuXG5leHBvcnQgZnVuY3Rpb24gcGFyc2VCb3RBdmF0YXJWYWx1ZShyYXc6IHN0cmluZyk6IFBhcnNlZEJvdEF2YXRhciB7XG4gIGlmIChyYXcuc3RhcnRzV2l0aChcImRhdGE6aW1hZ2UvXCIpKSB7XG4gICAgcmV0dXJuIHsga2luZDogXCJpbWFnZVwiLCBpbWFnZVVybDogcmF3IH07XG4gIH1cbiAgaWYgKHJhdy5pbmNsdWRlcyhcIjo6c2hhcGVfXCIpKSB7XG4gICAgY29uc3QgcGFydHMgPSByYXcuc3BsaXQoXCI6OnNoYXBlX1wiKTtcbiAgICBjb25zdCBjb2xvciA9IHBhcnRzWzBdIHx8IFwiI0Y5NzMxNlwiO1xuICAgIGNvbnN0IHJhd1NoYXBlID0gcGFydHNbMV0gPz8gXCIwXCI7XG4gICAgY29uc3QgcGFyc2VkU2hhcGUgPSAvXlxcZCskLy50ZXN0KHJhd1NoYXBlKSA/IE51bWJlcihyYXdTaGFwZSkgOiAwO1xuICAgIGNvbnN0IHNoYXBlSW5kZXggPSBOdW1iZXIuaXNTYWZlSW50ZWdlcihwYXJzZWRTaGFwZSkgPyBwYXJzZWRTaGFwZSAlIEJPVF9BVkFUQVJfU0hBUEVfQ09VTlQgOiAwO1xuICAgIHJldHVybiB7IGtpbmQ6IFwic2hhcGVcIiwgY29sb3IsIHNoYXBlSW5kZXggfTtcbiAgfVxuICBpZiAoSEVYX0NPTE9SLnRlc3QocmF3KSkgcmV0dXJuIHsga2luZDogXCJjb2xvclwiLCBjb2xvcjogcmF3IH07XG4gIHJldHVybiB7IGtpbmQ6IFwib3RoZXJcIiwgcmF3IH07XG59XG5cbi8qKiBUcnVlIGZvciB2YWx1ZXMgd2UgcGVyc2lzdCBvbiBgYm90cy5jb2xvcmAgKGhleCwgZW5jb2RlZCBzaGFwZSwgb3IgZGF0YSBpbWFnZSkuICovXG5leHBvcnQgZnVuY3Rpb24gaXNCb3RBdmF0YXJWYWx1ZShyYXc6IHN0cmluZyk6IGJvb2xlYW4ge1xuICBpZiAoIXJhdyB8fCByYXcubGVuZ3RoID4gQk9UX0FWQVRBUl9WQUxVRV9NQVhfTEVOR1RIKSByZXR1cm4gZmFsc2U7XG4gIHJldHVybiBIRVhfQ09MT1IudGVzdChyYXcpIHx8IFNIQVBFX1NVRkZJWC50ZXN0KHJhdykgfHwgREFUQV9JTUFHRS50ZXN0KHJhdyk7XG59XG5cbmV4cG9ydCBjb25zdCBCb3RBdmF0YXJWYWx1ZVNjaGVtYSA9IHpcbiAgLnN0cmluZygpXG4gIC5taW4oMSlcbiAgLm1heChCT1RfQVZBVEFSX1ZBTFVFX01BWF9MRU5HVEgpXG4gIC5yZWZpbmUoaXNCb3RBdmF0YXJWYWx1ZSwgeyBtZXNzYWdlOiBcIkludmFsaWQgYm90IGF2YXRhclwiIH0pO1xuIl0sImZpbGUiOiIvcGFja2FnZXMvY29udHJhY3RzL3NyYy9ib3QtYXZhdGFyLnRzIn0=
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvY29udHJhY3RzL3NyYy9ib3QtYXZhdGFyLnRzIiwiL3BhY2thZ2VzL2NvbnRyYWN0cy9zcmMvYm90LWF2YXRhci50cyIsW11d

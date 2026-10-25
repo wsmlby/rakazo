@@ -11,18 +11,29 @@ export const INBOX_ROW_ACTIONS = {
 } as const satisfies Record<InboxRowAction, { label: string; systemImage: string }>;
 
 /** Swipe right toggles read state; swipe left offers Archive outermost, then Pin. */
-export function inboxRowActions(chat: { unread?: boolean; pinned?: boolean }): {
+export function inboxRowActions(chat: {
+  unread?: boolean;
+  pinned?: boolean;
+  accessRole?: string;
+}): {
   leading: InboxRowAction;
   trailing: InboxRowAction[];
 } {
   return {
     leading: chat.unread ? "read" : "unread",
-    trailing: ["archive", chat.pinned ? "unpin" : "pin"],
+    trailing: [
+      ...(chat.accessRole === "collaborator" ? [] : ["archive" as const]),
+      chat.pinned ? "unpin" : "pin",
+    ],
   };
 }
 
 /** Every row action, as offered to screen readers. */
-export function inboxRowActionList(chat: { unread?: boolean; pinned?: boolean }) {
+export function inboxRowActionList(chat: {
+  unread?: boolean;
+  pinned?: boolean;
+  accessRole?: string;
+}) {
   const { leading, trailing } = inboxRowActions(chat);
   return [leading, ...trailing];
 }

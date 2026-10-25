@@ -24,6 +24,37 @@ import {
 } from "./thread-events.js";
 
 describe("thread event reduction", () => {
+  it("preserves human attribution through live message updates", () => {
+    const created = reduceThreadSnapshot(
+      snapshot([]),
+      event({
+        type: "thread.message.created",
+        payload: {
+          messageId: "shared-message",
+          role: "user",
+          authorUserId: "member",
+          authorName: "Team Member",
+          blocks: [{ kind: "text", text: "Continue" }],
+        },
+      }),
+    );
+    const updated = reduceThreadSnapshot(
+      created,
+      event({
+        type: "thread.message.updated",
+        payload: {
+          messageId: "shared-message",
+          role: "user",
+          blocks: [{ kind: "text", text: "Updated" }],
+        },
+      }),
+    );
+    expect(updated?.messages[0]).toMatchObject({
+      authorUserId: "member",
+      authorName: "Team Member",
+    });
+  });
+
   it("shows a committed direct send as queued before its snapshot refresh returns", () => {
     const initial = snapshot([message("user-1", [{ kind: "text", text: "Continue" }], 4)]);
 

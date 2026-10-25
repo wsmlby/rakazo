@@ -1,0 +1,84 @@
+__vite_ssr_exportName__("CLIENT_BUILD_HEADER", () => { try { return CLIENT_BUILD_HEADER } catch {} });
+__vite_ssr_exportName__("SERVER_BUILD_HEADER", () => { try { return SERVER_BUILD_HEADER } catch {} });
+__vite_ssr_exportName__("CLIENT_UPDATE_REQUIRED", () => { try { return CLIENT_UPDATE_REQUIRED } catch {} });
+__vite_ssr_exportName__("CLIENT_UPDATE_REQUIRED_STATUS", () => { try { return CLIENT_UPDATE_REQUIRED_STATUS } catch {} });
+__vite_ssr_exportName__("CLIENT_KINDS", () => { try { return CLIENT_KINDS } catch {} });
+__vite_ssr_exportName__("IOS_APP_STORE_URL", () => { try { return IOS_APP_STORE_URL } catch {} });
+__vite_ssr_exportName__("ANDROID_APK_URL", () => { try { return ANDROID_APK_URL } catch {} });
+__vite_ssr_exportName__("buildIdAt", () => { try { return buildIdAt } catch {} });
+__vite_ssr_exportName__("isBuildId", () => { try { return isBuildId } catch {} });
+__vite_ssr_exportName__("compareBuilds", () => { try { return compareBuilds } catch {} });
+__vite_ssr_exportName__("formatClientBuild", () => { try { return formatClientBuild } catch {} });
+__vite_ssr_exportName__("parseClientBuild", () => { try { return parseClientBuild } catch {} });
+__vite_ssr_exportName__("parseMinimumClientBuilds", () => { try { return parseMinimumClientBuilds } catch {} });
+__vite_ssr_exportName__("clientUpdateRequired", () => { try { return clientUpdateRequired } catch {} });
+__vite_ssr_exportName__("isClientUpdateRequiredError", () => { try { return isClientUpdateRequiredError } catch {} });
+/**
+* Client/server build handshake. Every API request names the client and the build it runs, and
+* every API response names the web build deployed beside the API, so an open tab can tell it is
+* running old code. A server can also refuse builds older than a minimum it is configured with.
+*/
+/** Request header: `web/20261022093015`. */
+const CLIENT_BUILD_HEADER = "x-rakazo-client-build";
+/** Response header: the web build deployed beside the API. */
+const SERVER_BUILD_HEADER = "x-rakazo-build";
+/** Error code sent with HTTP 426 when the server no longer supports the client's build. */
+const CLIENT_UPDATE_REQUIRED = "CLIENT_UPDATE_REQUIRED";
+const CLIENT_UPDATE_REQUIRED_STATUS = 426;
+const CLIENT_KINDS = ["web", "mobile"];
+const IOS_APP_STORE_URL = "https://apps.apple.com/app/rakazo/id6801531099";
+const ANDROID_APK_URL = "https://github.com/elie222/rakazo/releases/download/android/rakazo.apk";
+const BUILD_ID = /^\d{14}$/;
+/** A build id is the UTC time it was built, to the second (`YYYYMMDDHHMMSS`), so ids sort as text. */
+function buildIdAt(date) {
+	return date.toISOString().replace(/\D/g, "").slice(0, 14);
+};
+function isBuildId(value) {
+	return typeof value === "string" && BUILD_ID.test(value);
+};
+/** Negative when `a` is older than `b`; null when either is missing or malformed, so callers act on neither. */
+function compareBuilds(a, b) {
+	if (!isBuildId(a) || !isBuildId(b)) return null;
+	return a < b ? -1 : a > b ? 1 : 0;
+};
+function formatClientBuild(kind, build) {
+	return `${kind}/${build}`;
+};
+function parseClientBuild(header) {
+	const [kind, build, ...rest] = (header ?? "").trim().split("/");
+	if (rest.length || !CLIENT_KINDS.includes(kind) || !isBuildId(build)) return null;
+	return {
+		kind,
+		build
+	};
+};
+/** Parses `web=20261022093015,mobile=20261001000000`; throws on anything else so a typo cannot pass silently. */
+function parseMinimumClientBuilds(value) {
+	const minimums = {};
+	for (const entry of (value ?? "").split(",")) {
+		const trimmed = entry.trim();
+		if (!trimmed) continue;
+		const [kind, build, ...rest] = trimmed.split("=").map((part) => part.trim());
+		if (rest.length || !CLIENT_KINDS.includes(kind) || !isBuildId(build)) {
+			throw new Error(`Invalid RAKAZO_MIN_CLIENT_BUILD entry "${trimmed}": use web=YYYYMMDDHHMMSS or mobile=YYYYMMDDHHMMSS`);
+		};
+		minimums[kind] = build;
+	};
+	return minimums;
+};
+/** Only a client that names a build older than its kind's minimum is refused; unnamed callers pass. */
+function clientUpdateRequired(header, minimums) {
+	const client = parseClientBuild(header);
+	if (!client) return false;
+	return (compareBuilds(client.build, minimums[client.kind]) ?? 0) < 0;
+};
+/** Whether a failed request was refused because this client build is no longer supported. */
+function isClientUpdateRequiredError(error) {
+	if (typeof error !== "object" || error === null) return false;
+	const { code, status } = error;
+	return code === CLIENT_UPDATE_REQUIRED || status === CLIENT_UPDATE_REQUIRED_STATUS;
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7O0FBT08sTUFBTSxzQkFBc0I7O0FBRTVCLE1BQU0sc0JBQXNCOztBQUU1QixNQUFNLHlCQUF5QjtBQUMvQixNQUFNLGdDQUFnQztBQUV0QyxNQUFNLGVBQWUsQ0FBQyxPQUFPLFFBQVE7QUFJckMsTUFBTSxvQkFBb0I7QUFDMUIsTUFBTSxrQkFDWDtBQUVGLE1BQU0sV0FBVzs7QUFHVixTQUFTLFVBQVUsTUFBb0I7Q0FDNUMsT0FBTyxLQUFLLFlBQVksQ0FBQyxDQUFDLFFBQVEsT0FBTyxFQUFFLENBQUMsQ0FBQyxNQUFNLEdBQUcsRUFBRTtBQUMxRDtBQUVPLFNBQVMsVUFBVSxPQUFpQztDQUN6RCxPQUFPLE9BQU8sVUFBVSxZQUFZLFNBQVMsS0FBSyxLQUFLO0FBQ3pEOztBQUdPLFNBQVMsY0FBYyxHQUFZLEdBQTJCO0NBQ25FLElBQUksQ0FBQyxVQUFVLENBQUMsS0FBSyxDQUFDLFVBQVUsQ0FBQyxHQUFHLE9BQU87Q0FDM0MsT0FBTyxJQUFJLElBQUksQ0FBQyxJQUFJLElBQUksSUFBSSxJQUFJO0FBQ2xDO0FBRU8sU0FBUyxrQkFBa0IsTUFBa0IsT0FBdUI7Q0FDekUsT0FBTyxHQUFHLEtBQUssR0FBRztBQUNwQjtBQUVPLFNBQVMsaUJBQ2QsUUFDNEM7Q0FDNUMsTUFBTSxDQUFDLE1BQU0sT0FBTyxHQUFHLFNBQVMsVUFBVSxHQUFFLENBQUUsS0FBSyxDQUFDLENBQUMsTUFBTSxHQUFHO0NBQzlELElBQUksS0FBSyxVQUFVLENBQUMsYUFBYSxTQUFTLElBQWtCLEtBQUssQ0FBQyxVQUFVLEtBQUssR0FBRyxPQUFPO0NBQzNGLE9BQU87RUFBUTtFQUFvQjtDQUFNO0FBQzNDOztBQUdPLFNBQVMseUJBQXlCLE9BQWdEO0NBQ3ZGLE1BQU0sV0FBZ0MsQ0FBQztDQUN2QyxLQUFLLE1BQU0sVUFBVSxTQUFTLEdBQUUsQ0FBRSxNQUFNLEdBQUcsR0FBRztFQUM1QyxNQUFNLFVBQVUsTUFBTSxLQUFLO0VBQzNCLElBQUksQ0FBQyxTQUFTO0VBQ2QsTUFBTSxDQUFDLE1BQU0sT0FBTyxHQUFHLFFBQVEsUUFBUSxNQUFNLEdBQUcsQ0FBQyxDQUFDLEtBQUssU0FBUyxLQUFLLEtBQUssQ0FBQztFQUMzRSxJQUFJLEtBQUssVUFBVSxDQUFDLGFBQWEsU0FBUyxJQUFrQixLQUFLLENBQUMsVUFBVSxLQUFLLEdBQUc7R0FDbEYsTUFBTSxJQUFJLE1BQ1IsMENBQTBDLFFBQVEsbURBQ3BEO0VBQ0Y7RUFDQSxTQUFTLFFBQXNCO0NBQ2pDO0NBQ0EsT0FBTztBQUNUOztBQUdPLFNBQVMscUJBQ2QsUUFDQSxVQUNTO0NBQ1QsTUFBTSxTQUFTLGlCQUFpQixNQUFNO0NBQ3RDLElBQUksQ0FBQyxRQUFRLE9BQU87Q0FDcEIsUUFBUSxjQUFjLE9BQU8sT0FBTyxTQUFTLE9BQU8sS0FBSyxLQUFLLEtBQUs7QUFDckU7O0FBR08sU0FBUyw0QkFBNEIsT0FBeUI7Q0FDbkUsSUFBSSxPQUFPLFVBQVUsWUFBWSxVQUFVLE1BQU0sT0FBTztDQUN4RCxNQUFNLEVBQUUsTUFBTSxXQUFXO0NBQ3pCLE9BQU8sU0FBUywwQkFBMEIsV0FBVztBQUN2RCIsIm5hbWVzIjpbXSwiaWdub3JlTGlzdCI6W10sInNvdXJjZXMiOlsiY2xpZW50LWJ1aWxkLnRzIl0sInNvdXJjZXNDb250ZW50IjpbIi8qKlxuICogQ2xpZW50L3NlcnZlciBidWlsZCBoYW5kc2hha2UuIEV2ZXJ5IEFQSSByZXF1ZXN0IG5hbWVzIHRoZSBjbGllbnQgYW5kIHRoZSBidWlsZCBpdCBydW5zLCBhbmRcbiAqIGV2ZXJ5IEFQSSByZXNwb25zZSBuYW1lcyB0aGUgd2ViIGJ1aWxkIGRlcGxveWVkIGJlc2lkZSB0aGUgQVBJLCBzbyBhbiBvcGVuIHRhYiBjYW4gdGVsbCBpdCBpc1xuICogcnVubmluZyBvbGQgY29kZS4gQSBzZXJ2ZXIgY2FuIGFsc28gcmVmdXNlIGJ1aWxkcyBvbGRlciB0aGFuIGEgbWluaW11bSBpdCBpcyBjb25maWd1cmVkIHdpdGguXG4gKi9cblxuLyoqIFJlcXVlc3QgaGVhZGVyOiBgd2ViLzIwMjYxMDIyMDkzMDE1YC4gKi9cbmV4cG9ydCBjb25zdCBDTElFTlRfQlVJTERfSEVBREVSID0gXCJ4LXJha2F6by1jbGllbnQtYnVpbGRcIjtcbi8qKiBSZXNwb25zZSBoZWFkZXI6IHRoZSB3ZWIgYnVpbGQgZGVwbG95ZWQgYmVzaWRlIHRoZSBBUEkuICovXG5leHBvcnQgY29uc3QgU0VSVkVSX0JVSUxEX0hFQURFUiA9IFwieC1yYWthem8tYnVpbGRcIjtcbi8qKiBFcnJvciBjb2RlIHNlbnQgd2l0aCBIVFRQIDQyNiB3aGVuIHRoZSBzZXJ2ZXIgbm8gbG9uZ2VyIHN1cHBvcnRzIHRoZSBjbGllbnQncyBidWlsZC4gKi9cbmV4cG9ydCBjb25zdCBDTElFTlRfVVBEQVRFX1JFUVVJUkVEID0gXCJDTElFTlRfVVBEQVRFX1JFUVVJUkVEXCI7XG5leHBvcnQgY29uc3QgQ0xJRU5UX1VQREFURV9SRVFVSVJFRF9TVEFUVVMgPSA0MjY7XG5cbmV4cG9ydCBjb25zdCBDTElFTlRfS0lORFMgPSBbXCJ3ZWJcIiwgXCJtb2JpbGVcIl0gYXMgY29uc3Q7XG5leHBvcnQgdHlwZSBDbGllbnRLaW5kID0gKHR5cGVvZiBDTElFTlRfS0lORFMpW251bWJlcl07XG5leHBvcnQgdHlwZSBNaW5pbXVtQ2xpZW50QnVpbGRzID0gUGFydGlhbDxSZWNvcmQ8Q2xpZW50S2luZCwgc3RyaW5nPj47XG5cbmV4cG9ydCBjb25zdCBJT1NfQVBQX1NUT1JFX1VSTCA9IFwiaHR0cHM6Ly9hcHBzLmFwcGxlLmNvbS9hcHAvcmFrYXpvL2lkNjgwMTUzMTA5OVwiO1xuZXhwb3J0IGNvbnN0IEFORFJPSURfQVBLX1VSTCA9XG4gIFwiaHR0cHM6Ly9naXRodWIuY29tL2VsaWUyMjIvcmFrYXpvL3JlbGVhc2VzL2Rvd25sb2FkL2FuZHJvaWQvcmFrYXpvLmFwa1wiO1xuXG5jb25zdCBCVUlMRF9JRCA9IC9eXFxkezE0fSQvO1xuXG4vKiogQSBidWlsZCBpZCBpcyB0aGUgVVRDIHRpbWUgaXQgd2FzIGJ1aWx0LCB0byB0aGUgc2Vjb25kIChgWVlZWU1NRERISE1NU1NgKSwgc28gaWRzIHNvcnQgYXMgdGV4dC4gKi9cbmV4cG9ydCBmdW5jdGlvbiBidWlsZElkQXQoZGF0ZTogRGF0ZSk6IHN0cmluZyB7XG4gIHJldHVybiBkYXRlLnRvSVNPU3RyaW5nKCkucmVwbGFjZSgvXFxEL2csIFwiXCIpLnNsaWNlKDAsIDE0KTtcbn1cblxuZXhwb3J0IGZ1bmN0aW9uIGlzQnVpbGRJZCh2YWx1ZTogdW5rbm93bik6IHZhbHVlIGlzIHN0cmluZyB7XG4gIHJldHVybiB0eXBlb2YgdmFsdWUgPT09IFwic3RyaW5nXCIgJiYgQlVJTERfSUQudGVzdCh2YWx1ZSk7XG59XG5cbi8qKiBOZWdhdGl2ZSB3aGVuIGBhYCBpcyBvbGRlciB0aGFuIGBiYDsgbnVsbCB3aGVuIGVpdGhlciBpcyBtaXNzaW5nIG9yIG1hbGZvcm1lZCwgc28gY2FsbGVycyBhY3Qgb24gbmVpdGhlci4gKi9cbmV4cG9ydCBmdW5jdGlvbiBjb21wYXJlQnVpbGRzKGE6IHVua25vd24sIGI6IHVua25vd24pOiBudW1iZXIgfCBudWxsIHtcbiAgaWYgKCFpc0J1aWxkSWQoYSkgfHwgIWlzQnVpbGRJZChiKSkgcmV0dXJuIG51bGw7XG4gIHJldHVybiBhIDwgYiA/IC0xIDogYSA+IGIgPyAxIDogMDtcbn1cblxuZXhwb3J0IGZ1bmN0aW9uIGZvcm1hdENsaWVudEJ1aWxkKGtpbmQ6IENsaWVudEtpbmQsIGJ1aWxkOiBzdHJpbmcpOiBzdHJpbmcge1xuICByZXR1cm4gYCR7a2luZH0vJHtidWlsZH1gO1xufVxuXG5leHBvcnQgZnVuY3Rpb24gcGFyc2VDbGllbnRCdWlsZChcbiAgaGVhZGVyOiBzdHJpbmcgfCBudWxsIHwgdW5kZWZpbmVkLFxuKTogeyBraW5kOiBDbGllbnRLaW5kOyBidWlsZDogc3RyaW5nIH0gfCBudWxsIHtcbiAgY29uc3QgW2tpbmQsIGJ1aWxkLCAuLi5yZXN0XSA9IChoZWFkZXIgPz8gXCJcIikudHJpbSgpLnNwbGl0KFwiL1wiKTtcbiAgaWYgKHJlc3QubGVuZ3RoIHx8ICFDTElFTlRfS0lORFMuaW5jbHVkZXMoa2luZCBhcyBDbGllbnRLaW5kKSB8fCAhaXNCdWlsZElkKGJ1aWxkKSkgcmV0dXJuIG51bGw7XG4gIHJldHVybiB7IGtpbmQ6IGtpbmQgYXMgQ2xpZW50S2luZCwgYnVpbGQgfTtcbn1cblxuLyoqIFBhcnNlcyBgd2ViPTIwMjYxMDIyMDkzMDE1LG1vYmlsZT0yMDI2MTAwMTAwMDAwMGA7IHRocm93cyBvbiBhbnl0aGluZyBlbHNlIHNvIGEgdHlwbyBjYW5ub3QgcGFzcyBzaWxlbnRseS4gKi9cbmV4cG9ydCBmdW5jdGlvbiBwYXJzZU1pbmltdW1DbGllbnRCdWlsZHModmFsdWU6IHN0cmluZyB8IHVuZGVmaW5lZCk6IE1pbmltdW1DbGllbnRCdWlsZHMge1xuICBjb25zdCBtaW5pbXVtczogTWluaW11bUNsaWVudEJ1aWxkcyA9IHt9O1xuICBmb3IgKGNvbnN0IGVudHJ5IG9mICh2YWx1ZSA/PyBcIlwiKS5zcGxpdChcIixcIikpIHtcbiAgICBjb25zdCB0cmltbWVkID0gZW50cnkudHJpbSgpO1xuICAgIGlmICghdHJpbW1lZCkgY29udGludWU7XG4gICAgY29uc3QgW2tpbmQsIGJ1aWxkLCAuLi5yZXN0XSA9IHRyaW1tZWQuc3BsaXQoXCI9XCIpLm1hcCgocGFydCkgPT4gcGFydC50cmltKCkpO1xuICAgIGlmIChyZXN0Lmxlbmd0aCB8fCAhQ0xJRU5UX0tJTkRTLmluY2x1ZGVzKGtpbmQgYXMgQ2xpZW50S2luZCkgfHwgIWlzQnVpbGRJZChidWlsZCkpIHtcbiAgICAgIHRocm93IG5ldyBFcnJvcihcbiAgICAgICAgYEludmFsaWQgUkFLQVpPX01JTl9DTElFTlRfQlVJTEQgZW50cnkgXCIke3RyaW1tZWR9XCI6IHVzZSB3ZWI9WVlZWU1NRERISE1NU1Mgb3IgbW9iaWxlPVlZWVlNTURESEhNTVNTYCxcbiAgICAgICk7XG4gICAgfVxuICAgIG1pbmltdW1zW2tpbmQgYXMgQ2xpZW50S2luZF0gPSBidWlsZDtcbiAgfVxuICByZXR1cm4gbWluaW11bXM7XG59XG5cbi8qKiBPbmx5IGEgY2xpZW50IHRoYXQgbmFtZXMgYSBidWlsZCBvbGRlciB0aGFuIGl0cyBraW5kJ3MgbWluaW11bSBpcyByZWZ1c2VkOyB1bm5hbWVkIGNhbGxlcnMgcGFzcy4gKi9cbmV4cG9ydCBmdW5jdGlvbiBjbGllbnRVcGRhdGVSZXF1aXJlZChcbiAgaGVhZGVyOiBzdHJpbmcgfCBudWxsIHwgdW5kZWZpbmVkLFxuICBtaW5pbXVtczogTWluaW11bUNsaWVudEJ1aWxkcyxcbik6IGJvb2xlYW4ge1xuICBjb25zdCBjbGllbnQgPSBwYXJzZUNsaWVudEJ1aWxkKGhlYWRlcik7XG4gIGlmICghY2xpZW50KSByZXR1cm4gZmFsc2U7XG4gIHJldHVybiAoY29tcGFyZUJ1aWxkcyhjbGllbnQuYnVpbGQsIG1pbmltdW1zW2NsaWVudC5raW5kXSkgPz8gMCkgPCAwO1xufVxuXG4vKiogV2hldGhlciBhIGZhaWxlZCByZXF1ZXN0IHdhcyByZWZ1c2VkIGJlY2F1c2UgdGhpcyBjbGllbnQgYnVpbGQgaXMgbm8gbG9uZ2VyIHN1cHBvcnRlZC4gKi9cbmV4cG9ydCBmdW5jdGlvbiBpc0NsaWVudFVwZGF0ZVJlcXVpcmVkRXJyb3IoZXJyb3I6IHVua25vd24pOiBib29sZWFuIHtcbiAgaWYgKHR5cGVvZiBlcnJvciAhPT0gXCJvYmplY3RcIiB8fCBlcnJvciA9PT0gbnVsbCkgcmV0dXJuIGZhbHNlO1xuICBjb25zdCB7IGNvZGUsIHN0YXR1cyB9ID0gZXJyb3IgYXMgeyBjb2RlPzogdW5rbm93bjsgc3RhdHVzPzogdW5rbm93biB9O1xuICByZXR1cm4gY29kZSA9PT0gQ0xJRU5UX1VQREFURV9SRVFVSVJFRCB8fCBzdGF0dXMgPT09IENMSUVOVF9VUERBVEVfUkVRVUlSRURfU1RBVFVTO1xufVxuIl0sImZpbGUiOiIvcGFja2FnZXMvY29udHJhY3RzL3NyYy9jbGllbnQtYnVpbGQudHMifQ==
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvY29udHJhY3RzL3NyYy9jbGllbnQtYnVpbGQudHMiLCIvcGFja2FnZXMvY29udHJhY3RzL3NyYy9jbGllbnQtYnVpbGQudHMiLFtdXQ==

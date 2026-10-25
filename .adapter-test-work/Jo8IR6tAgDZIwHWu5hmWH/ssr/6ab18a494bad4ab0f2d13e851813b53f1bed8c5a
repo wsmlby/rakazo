@@ -1,0 +1,117 @@
+__vite_ssr_exportName__("WORKING_RUN_STATUSES", () => { try { return WORKING_RUN_STATUSES } catch {} });
+__vite_ssr_exportName__("WAITING_ON_USER_RUN_STATUSES", () => { try { return WAITING_ON_USER_RUN_STATUSES } catch {} });
+__vite_ssr_exportName__("ACTIVE_RUN_STATUSES", () => { try { return ACTIVE_RUN_STATUSES } catch {} });
+__vite_ssr_exportName__("QUEUE_HOLDING_RUN_STATUSES", () => { try { return QUEUE_HOLDING_RUN_STATUSES } catch {} });
+__vite_ssr_exportName__("BACKGROUND_RUN_TRIGGERS", () => { try { return BACKGROUND_RUN_TRIGGERS } catch {} });
+__vite_ssr_exportName__("isBackgroundRunTrigger", () => { try { return isBackgroundRunTrigger } catch {} });
+__vite_ssr_exportName__("canTransition", () => { try { return canTransition } catch {} });
+__vite_ssr_exportName__("assertTransition", () => { try { return assertTransition } catch {} });
+__vite_ssr_exportName__("isActive", () => { try { return isActive } catch {} });
+__vite_ssr_exportName__("isRunWorking", () => { try { return isRunWorking } catch {} });
+__vite_ssr_exportName__("isRunWaitingOnUser", () => { try { return isRunWaitingOnUser } catch {} });
+__vite_ssr_exportName__("isTerminal", () => { try { return isTerminal } catch {} });
+__vite_ssr_exportName__("STEERING_CONTINUATION_PROMPT", () => { try { return STEERING_CONTINUATION_PROMPT } catch {} });
+__vite_ssr_exportName__("isConversationalRun", () => { try { return isConversationalRun } catch {} });
+__vite_ssr_exportName__("nextFence", () => { try { return nextFence } catch {} });
+/** Runs the bot is working on, which the chat shows as working. */
+const WORKING_RUN_STATUSES = [
+	"queued",
+	"leased",
+	"running"
+];
+/** Runs paused on the user: an answer, an approval, or a computer takeover. Their card is the state. */
+const WAITING_ON_USER_RUN_STATUSES = ["waiting_input", "waiting_takeover"];
+const ACTIVE_RUN_STATUSES = [...WORKING_RUN_STATUSES, ...WAITING_ON_USER_RUN_STATUSES];
+/** Runs that hold new work in the queue. A pending card holds no compute. */
+const QUEUE_HOLDING_RUN_STATUSES = ACTIVE_RUN_STATUSES.filter((status) => status !== "waiting_input");
+const TERMINAL = [
+	"completed",
+	"failed",
+	"cancelled"
+];
+/**
+* These turns carry their own prompt and must not take a user message as steering.
+* Routine and webhook runs are not the conversation, and neither is a wake from another bot:
+* its reply goes back to that bot. The creation intro can only ask what it is for; a message
+* that lands during any of them waits, and the continuation after the turn finishes answers it.
+*/
+const NON_CONVERSATIONAL_RUN_TRIGGERS = new Set([
+	"routine",
+	"webhook",
+	"created",
+	"tickets",
+	"bot_message"
+]);
+/**
+* Background triggers do internal work that must not leak into the chat: the
+* sidebar must not show them as activity and the bot transcript must not render
+* their steps/text. Ticket work reports through board comments and its status.
+* Existing ask and approval cards can still request user input.
+*/
+const BACKGROUND_RUN_TRIGGERS = ["tickets"];
+const BACKGROUND_RUN_TRIGGER_SET = new Set(BACKGROUND_RUN_TRIGGERS);
+function isBackgroundRunTrigger(trigger) {
+	return BACKGROUND_RUN_TRIGGER_SET.has(trigger ?? "");
+};
+const allowed = {
+	queued: ["leased", "cancelled"],
+	leased: [
+		"running",
+		"queued",
+		"cancelled"
+	],
+	running: [
+		"waiting_input",
+		"waiting_takeover",
+		"completed",
+		"failed",
+		"cancelled",
+		"leased"
+	],
+	waiting_input: [
+		"queued",
+		"leased",
+		"cancelled"
+	],
+	waiting_takeover: [
+		"queued",
+		"leased",
+		"cancelled"
+	],
+	completed: [],
+	failed: ["queued"],
+	cancelled: []
+};
+function canTransition(from, to) {
+	return allowed[from]?.includes(to) ?? false;
+};
+function assertTransition(from, to) {
+	if (!canTransition(from, to)) {
+		throw new Error(`Illegal run transition ${from} -> ${to}`);
+	}
+};
+function isActive(status) {
+	return ACTIVE_RUN_STATUSES.includes(status);
+};
+function isRunWorking(status) {
+	return WORKING_RUN_STATUSES.some((working) => working === status);
+};
+function isRunWaitingOnUser(status) {
+	return WAITING_ON_USER_RUN_STATUSES.some((waiting) => waiting === status);
+};
+function isTerminal(status) {
+	return TERMINAL.includes(status);
+};
+/** Prompt of a run created to answer messages that waited behind another turn. */
+const STEERING_CONTINUATION_PROMPT = "Respond to the user's steering context.";
+/** Whether a run's turn is part of the thread's conversation and may take user steering. */
+function isConversationalRun(trigger) {
+	return !NON_CONVERSATIONAL_RUN_TRIGGERS.has(trigger ?? "");
+};
+function nextFence(current) {
+	return current + 1;
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7Ozs7Ozs7Ozs7Ozs7OztBQUdPLE1BQU0sdUJBQXVCO0NBQ2xDO0NBQ0E7Q0FDQTtBQUNGOztBQUVPLE1BQU0sK0JBQStCLENBQzFDLGlCQUNBLGtCQUNGO0FBQ08sTUFBTSxzQkFBc0IsQ0FDakMsR0FBRyxzQkFDSCxHQUFHLDRCQUNMOztBQUVPLE1BQU0sNkJBQTZCLG9CQUFvQixRQUMzRCxXQUFXLFdBQVcsZUFDekI7QUFDQSxNQUFNLFdBQXdCO0NBQUM7Q0FBYTtDQUFVO0FBQVc7Ozs7Ozs7QUFPakUsTUFBTSxrQ0FBa0MsSUFBSSxJQUFJO0NBQzlDO0NBQ0E7Q0FDQTtDQUNBO0NBQ0E7QUFDRixDQUFDOzs7Ozs7O0FBUU0sTUFBTSwwQkFBMEIsQ0FBQyxTQUFTO0FBQ2pELE1BQU0sNkJBQTZCLElBQUksSUFBWSx1QkFBdUI7QUFFbkUsU0FBUyx1QkFBdUIsU0FBNkM7Q0FDbEYsT0FBTywyQkFBMkIsSUFBSSxXQUFXLEVBQUU7QUFDckQ7QUFFQSxNQUFNLFVBQTBDO0NBQzlDLFFBQVEsQ0FBQyxVQUFVLFdBQVc7Q0FDOUIsUUFBUTtFQUFDO0VBQVc7RUFBVTtDQUFXO0NBQ3pDLFNBQVM7RUFBQztFQUFpQjtFQUFvQjtFQUFhO0VBQVU7RUFBYTtDQUFRO0NBQzNGLGVBQWU7RUFBQztFQUFVO0VBQVU7Q0FBVztDQUMvQyxrQkFBa0I7RUFBQztFQUFVO0VBQVU7Q0FBVztDQUNsRCxXQUFXLENBQUM7Q0FDWixRQUFRLENBQUMsUUFBUTtDQUNqQixXQUFXLENBQUM7QUFDZDtBQUVPLFNBQVMsY0FBYyxNQUFpQixJQUF3QjtDQUNyRSxPQUFPLFFBQVEsS0FBSyxFQUFFLFNBQVMsRUFBRSxLQUFLO0FBQ3hDO0FBRU8sU0FBUyxpQkFBaUIsTUFBaUIsSUFBcUI7Q0FDckUsSUFBSSxDQUFDLGNBQWMsTUFBTSxFQUFFLEdBQUc7RUFDNUIsTUFBTSxJQUFJLE1BQU0sMEJBQTBCLEtBQUssTUFBTSxJQUFJO0NBQzNEO0FBQ0Y7QUFFTyxTQUFTLFNBQVMsUUFBNEI7Q0FDbkQsT0FBUSxvQkFBNkMsU0FBUyxNQUFNO0FBQ3RFO0FBRU8sU0FBUyxhQUFhLFFBQTRDO0NBQ3ZFLE9BQU8scUJBQXFCLE1BQU0sWUFBWSxZQUFZLE1BQU07QUFDbEU7QUFFTyxTQUFTLG1CQUFtQixRQUE0QztDQUM3RSxPQUFPLDZCQUE2QixNQUFNLFlBQVksWUFBWSxNQUFNO0FBQzFFO0FBRU8sU0FBUyxXQUFXLFFBQTRCO0NBQ3JELE9BQU8sU0FBUyxTQUFTLE1BQU07QUFDakM7O0FBR08sTUFBTSwrQkFBK0I7O0FBR3JDLFNBQVMsb0JBQW9CLFNBQTZDO0NBQy9FLE9BQU8sQ0FBQyxnQ0FBZ0MsSUFBSSxXQUFXLEVBQUU7QUFDM0Q7QUFFTyxTQUFTLFVBQVUsU0FBeUI7Q0FDakQsT0FBTyxVQUFVO0FBQ25CIiwibmFtZXMiOltdLCJpZ25vcmVMaXN0IjpbXSwic291cmNlcyI6WyJydW4tc3RhdGUudHMiXSwic291cmNlc0NvbnRlbnQiOlsiaW1wb3J0IHR5cGUgeyBSdW5TdGF0dXMgfSBmcm9tIFwiQHJha2F6by9jb250cmFjdHNcIjtcblxuLyoqIFJ1bnMgdGhlIGJvdCBpcyB3b3JraW5nIG9uLCB3aGljaCB0aGUgY2hhdCBzaG93cyBhcyB3b3JraW5nLiAqL1xuZXhwb3J0IGNvbnN0IFdPUktJTkdfUlVOX1NUQVRVU0VTID0gW1xuICBcInF1ZXVlZFwiLFxuICBcImxlYXNlZFwiLFxuICBcInJ1bm5pbmdcIixcbl0gYXMgY29uc3Qgc2F0aXNmaWVzIHJlYWRvbmx5IFJ1blN0YXR1c1tdO1xuLyoqIFJ1bnMgcGF1c2VkIG9uIHRoZSB1c2VyOiBhbiBhbnN3ZXIsIGFuIGFwcHJvdmFsLCBvciBhIGNvbXB1dGVyIHRha2VvdmVyLiBUaGVpciBjYXJkIGlzIHRoZSBzdGF0ZS4gKi9cbmV4cG9ydCBjb25zdCBXQUlUSU5HX09OX1VTRVJfUlVOX1NUQVRVU0VTID0gW1xuICBcIndhaXRpbmdfaW5wdXRcIixcbiAgXCJ3YWl0aW5nX3Rha2VvdmVyXCIsXG5dIGFzIGNvbnN0IHNhdGlzZmllcyByZWFkb25seSBSdW5TdGF0dXNbXTtcbmV4cG9ydCBjb25zdCBBQ1RJVkVfUlVOX1NUQVRVU0VTID0gW1xuICAuLi5XT1JLSU5HX1JVTl9TVEFUVVNFUyxcbiAgLi4uV0FJVElOR19PTl9VU0VSX1JVTl9TVEFUVVNFUyxcbl0gYXMgY29uc3Qgc2F0aXNmaWVzIHJlYWRvbmx5IFJ1blN0YXR1c1tdO1xuLyoqIFJ1bnMgdGhhdCBob2xkIG5ldyB3b3JrIGluIHRoZSBxdWV1ZS4gQSBwZW5kaW5nIGNhcmQgaG9sZHMgbm8gY29tcHV0ZS4gKi9cbmV4cG9ydCBjb25zdCBRVUVVRV9IT0xESU5HX1JVTl9TVEFUVVNFUyA9IEFDVElWRV9SVU5fU1RBVFVTRVMuZmlsdGVyKFxuICAoc3RhdHVzKSA9PiBzdGF0dXMgIT09IFwid2FpdGluZ19pbnB1dFwiLFxuKTtcbmNvbnN0IFRFUk1JTkFMOiBSdW5TdGF0dXNbXSA9IFtcImNvbXBsZXRlZFwiLCBcImZhaWxlZFwiLCBcImNhbmNlbGxlZFwiXTtcbi8qKlxuICogVGhlc2UgdHVybnMgY2FycnkgdGhlaXIgb3duIHByb21wdCBhbmQgbXVzdCBub3QgdGFrZSBhIHVzZXIgbWVzc2FnZSBhcyBzdGVlcmluZy5cbiAqIFJvdXRpbmUgYW5kIHdlYmhvb2sgcnVucyBhcmUgbm90IHRoZSBjb252ZXJzYXRpb24sIGFuZCBuZWl0aGVyIGlzIGEgd2FrZSBmcm9tIGFub3RoZXIgYm90OlxuICogaXRzIHJlcGx5IGdvZXMgYmFjayB0byB0aGF0IGJvdC4gVGhlIGNyZWF0aW9uIGludHJvIGNhbiBvbmx5IGFzayB3aGF0IGl0IGlzIGZvcjsgYSBtZXNzYWdlXG4gKiB0aGF0IGxhbmRzIGR1cmluZyBhbnkgb2YgdGhlbSB3YWl0cywgYW5kIHRoZSBjb250aW51YXRpb24gYWZ0ZXIgdGhlIHR1cm4gZmluaXNoZXMgYW5zd2VycyBpdC5cbiAqL1xuY29uc3QgTk9OX0NPTlZFUlNBVElPTkFMX1JVTl9UUklHR0VSUyA9IG5ldyBTZXQoW1xuICBcInJvdXRpbmVcIixcbiAgXCJ3ZWJob29rXCIsXG4gIFwiY3JlYXRlZFwiLFxuICBcInRpY2tldHNcIixcbiAgXCJib3RfbWVzc2FnZVwiLFxuXSk7XG5cbi8qKlxuICogQmFja2dyb3VuZCB0cmlnZ2VycyBkbyBpbnRlcm5hbCB3b3JrIHRoYXQgbXVzdCBub3QgbGVhayBpbnRvIHRoZSBjaGF0OiB0aGVcbiAqIHNpZGViYXIgbXVzdCBub3Qgc2hvdyB0aGVtIGFzIGFjdGl2aXR5IGFuZCB0aGUgYm90IHRyYW5zY3JpcHQgbXVzdCBub3QgcmVuZGVyXG4gKiB0aGVpciBzdGVwcy90ZXh0LiBUaWNrZXQgd29yayByZXBvcnRzIHRocm91Z2ggYm9hcmQgY29tbWVudHMgYW5kIGl0cyBzdGF0dXMuXG4gKiBFeGlzdGluZyBhc2sgYW5kIGFwcHJvdmFsIGNhcmRzIGNhbiBzdGlsbCByZXF1ZXN0IHVzZXIgaW5wdXQuXG4gKi9cbmV4cG9ydCBjb25zdCBCQUNLR1JPVU5EX1JVTl9UUklHR0VSUyA9IFtcInRpY2tldHNcIl0gYXMgY29uc3Q7XG5jb25zdCBCQUNLR1JPVU5EX1JVTl9UUklHR0VSX1NFVCA9IG5ldyBTZXQ8c3RyaW5nPihCQUNLR1JPVU5EX1JVTl9UUklHR0VSUyk7XG5cbmV4cG9ydCBmdW5jdGlvbiBpc0JhY2tncm91bmRSdW5UcmlnZ2VyKHRyaWdnZXI6IHN0cmluZyB8IG51bGwgfCB1bmRlZmluZWQpOiBib29sZWFuIHtcbiAgcmV0dXJuIEJBQ0tHUk9VTkRfUlVOX1RSSUdHRVJfU0VULmhhcyh0cmlnZ2VyID8/IFwiXCIpO1xufVxuXG5jb25zdCBhbGxvd2VkOiBSZWNvcmQ8UnVuU3RhdHVzLCBSdW5TdGF0dXNbXT4gPSB7XG4gIHF1ZXVlZDogW1wibGVhc2VkXCIsIFwiY2FuY2VsbGVkXCJdLFxuICBsZWFzZWQ6IFtcInJ1bm5pbmdcIiwgXCJxdWV1ZWRcIiwgXCJjYW5jZWxsZWRcIl0sXG4gIHJ1bm5pbmc6IFtcIndhaXRpbmdfaW5wdXRcIiwgXCJ3YWl0aW5nX3Rha2VvdmVyXCIsIFwiY29tcGxldGVkXCIsIFwiZmFpbGVkXCIsIFwiY2FuY2VsbGVkXCIsIFwibGVhc2VkXCJdLFxuICB3YWl0aW5nX2lucHV0OiBbXCJxdWV1ZWRcIiwgXCJsZWFzZWRcIiwgXCJjYW5jZWxsZWRcIl0sXG4gIHdhaXRpbmdfdGFrZW92ZXI6IFtcInF1ZXVlZFwiLCBcImxlYXNlZFwiLCBcImNhbmNlbGxlZFwiXSxcbiAgY29tcGxldGVkOiBbXSxcbiAgZmFpbGVkOiBbXCJxdWV1ZWRcIl0sXG4gIGNhbmNlbGxlZDogW10sXG59O1xuXG5leHBvcnQgZnVuY3Rpb24gY2FuVHJhbnNpdGlvbihmcm9tOiBSdW5TdGF0dXMsIHRvOiBSdW5TdGF0dXMpOiBib29sZWFuIHtcbiAgcmV0dXJuIGFsbG93ZWRbZnJvbV0/LmluY2x1ZGVzKHRvKSA/PyBmYWxzZTtcbn1cblxuZXhwb3J0IGZ1bmN0aW9uIGFzc2VydFRyYW5zaXRpb24oZnJvbTogUnVuU3RhdHVzLCB0bzogUnVuU3RhdHVzKTogdm9pZCB7XG4gIGlmICghY2FuVHJhbnNpdGlvbihmcm9tLCB0bykpIHtcbiAgICB0aHJvdyBuZXcgRXJyb3IoYElsbGVnYWwgcnVuIHRyYW5zaXRpb24gJHtmcm9tfSAtPiAke3RvfWApO1xuICB9XG59XG5cbmV4cG9ydCBmdW5jdGlvbiBpc0FjdGl2ZShzdGF0dXM6IFJ1blN0YXR1cyk6IGJvb2xlYW4ge1xuICByZXR1cm4gKEFDVElWRV9SVU5fU1RBVFVTRVMgYXMgcmVhZG9ubHkgUnVuU3RhdHVzW10pLmluY2x1ZGVzKHN0YXR1cyk7XG59XG5cbmV4cG9ydCBmdW5jdGlvbiBpc1J1bldvcmtpbmcoc3RhdHVzOiBzdHJpbmcgfCBudWxsIHwgdW5kZWZpbmVkKTogYm9vbGVhbiB7XG4gIHJldHVybiBXT1JLSU5HX1JVTl9TVEFUVVNFUy5zb21lKCh3b3JraW5nKSA9PiB3b3JraW5nID09PSBzdGF0dXMpO1xufVxuXG5leHBvcnQgZnVuY3Rpb24gaXNSdW5XYWl0aW5nT25Vc2VyKHN0YXR1czogc3RyaW5nIHwgbnVsbCB8IHVuZGVmaW5lZCk6IGJvb2xlYW4ge1xuICByZXR1cm4gV0FJVElOR19PTl9VU0VSX1JVTl9TVEFUVVNFUy5zb21lKCh3YWl0aW5nKSA9PiB3YWl0aW5nID09PSBzdGF0dXMpO1xufVxuXG5leHBvcnQgZnVuY3Rpb24gaXNUZXJtaW5hbChzdGF0dXM6IFJ1blN0YXR1cyk6IGJvb2xlYW4ge1xuICByZXR1cm4gVEVSTUlOQUwuaW5jbHVkZXMoc3RhdHVzKTtcbn1cblxuLyoqIFByb21wdCBvZiBhIHJ1biBjcmVhdGVkIHRvIGFuc3dlciBtZXNzYWdlcyB0aGF0IHdhaXRlZCBiZWhpbmQgYW5vdGhlciB0dXJuLiAqL1xuZXhwb3J0IGNvbnN0IFNURUVSSU5HX0NPTlRJTlVBVElPTl9QUk9NUFQgPSBcIlJlc3BvbmQgdG8gdGhlIHVzZXIncyBzdGVlcmluZyBjb250ZXh0LlwiO1xuXG4vKiogV2hldGhlciBhIHJ1bidzIHR1cm4gaXMgcGFydCBvZiB0aGUgdGhyZWFkJ3MgY29udmVyc2F0aW9uIGFuZCBtYXkgdGFrZSB1c2VyIHN0ZWVyaW5nLiAqL1xuZXhwb3J0IGZ1bmN0aW9uIGlzQ29udmVyc2F0aW9uYWxSdW4odHJpZ2dlcjogc3RyaW5nIHwgbnVsbCB8IHVuZGVmaW5lZCk6IGJvb2xlYW4ge1xuICByZXR1cm4gIU5PTl9DT05WRVJTQVRJT05BTF9SVU5fVFJJR0dFUlMuaGFzKHRyaWdnZXIgPz8gXCJcIik7XG59XG5cbmV4cG9ydCBmdW5jdGlvbiBuZXh0RmVuY2UoY3VycmVudDogbnVtYmVyKTogbnVtYmVyIHtcbiAgcmV0dXJuIGN1cnJlbnQgKyAxO1xufVxuIl0sImZpbGUiOiIvcGFja2FnZXMvY29yZS9zcmMvcnVuLXN0YXRlLnRzIn0=
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvY29yZS9zcmMvcnVuLXN0YXRlLnRzIiwiL3BhY2thZ2VzL2NvcmUvc3JjL3J1bi1zdGF0ZS50cyIsW11d

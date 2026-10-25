@@ -1,0 +1,60 @@
+__vite_ssr_exportName__("authCapabilitiesSchema", () => { try { return authCapabilitiesSchema } catch {} });
+__vite_ssr_exportName__("accountSecuritySchema", () => { try { return accountSecuritySchema } catch {} });
+__vite_ssr_exportName__("legacyAuthCapabilitiesSchema", () => { try { return legacyAuthCapabilitiesSchema } catch {} });
+__vite_ssr_exportName__("legacyAccountSecurity", () => { try { return legacyAccountSecurity } catch {} });
+const __vite_ssr_import_0__ = await __vite_ssr_import__("/node_modules/.pnpm/zod@4.6.7/node_modules/zod/index.js", {"importedNames":["z"]});
+
+const authCapabilitiesSchema = __vite_ssr_import_0__.z.object({
+	sso: __vite_ssr_import_0__.z.object({
+		name: __vite_ssr_import_0__.z.string().min(1),
+		availability: __vite_ssr_import_0__.z.enum([
+			"available",
+			"unavailable",
+			"checking"
+		])
+	}).nullable(),
+	passwordAuth: __vite_ssr_import_0__.z.boolean(),
+	passwordReset: __vite_ssr_import_0__.z.boolean(),
+	resetUrl: __vite_ssr_import_0__.z.string().url().nullable(),
+	// Older servers omit this field; clients treat omission as unavailable.
+	emailCode: __vite_ssr_import_0__.z.boolean().optional(),
+	billing: __vite_ssr_import_0__.z.boolean().optional(),
+	/** WebAuthn relying party ID; null or omitted when this server does not offer passkeys. */
+	passkeyRpId: __vite_ssr_import_0__.z.string().min(1).nullable().optional(),
+	/** Native apps this domain vouches for; omitted by older servers, which means none. */
+	nativePasskeys: __vite_ssr_import_0__.z.object({
+		ios: __vite_ssr_import_0__.z.boolean(),
+		android: __vite_ssr_import_0__.z.boolean()
+	}).optional()
+});
+const accountSecuritySchema = __vite_ssr_import_0__.z.object({
+	hasPassword: __vite_ssr_import_0__.z.boolean(),
+	// Older servers omit this field; clients treat omission as enabled.
+	passwordChangeEnabled: __vite_ssr_import_0__.z.boolean().optional(),
+	freshOidcAuth: __vite_ssr_import_0__.z.boolean(),
+	ssoLinked: __vite_ssr_import_0__.z.boolean(),
+	emailDeletion: __vite_ssr_import_0__.z.boolean(),
+	sso: __vite_ssr_import_0__.z.object({ name: __vite_ssr_import_0__.z.string().min(1) }).nullable()
+});
+/** Only a complete pre-SSO shape may opt into password-only compatibility. */
+const legacyAuthCapabilitiesSchema = authCapabilitiesSchema.omit({
+	sso: true,
+	passwordAuth: true
+}).strict().transform((value) => ({
+	...value,
+	passwordAuth: true,
+	sso: null
+}));
+/** Pre-SSO servers only had credential accounts and password-protected deletion. */
+const legacyAccountSecurity = {
+	hasPassword: true,
+	passwordChangeEnabled: true,
+	freshOidcAuth: false,
+	ssoLinked: false,
+	emailDeletion: false,
+	sso: null
+};
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7OztBQUFBOztBQUVPLE1BQU0seUJBQXlCLHdCQUFFLE9BQU87Q0FDN0MsS0FBSyx3QkFDRixPQUFPO0VBQ04sTUFBTSx3QkFBRSxPQUFPLENBQUMsQ0FBQyxJQUFJLENBQUM7RUFDdEIsY0FBYyx3QkFBRSxLQUFLO0dBQUM7R0FBYTtHQUFlO0VBQVUsQ0FBQztDQUMvRCxDQUFDLENBQUMsQ0FDRCxTQUFTO0NBQ1osY0FBYyx3QkFBRSxRQUFRO0NBQ3hCLGVBQWUsd0JBQUUsUUFBUTtDQUN6QixVQUFVLHdCQUFFLE9BQU8sQ0FBQyxDQUFDLElBQUksQ0FBQyxDQUFDLFNBQVM7O0NBRXBDLFdBQVcsd0JBQUUsUUFBUSxDQUFDLENBQUMsU0FBUztDQUNoQyxTQUFTLHdCQUFFLFFBQVEsQ0FBQyxDQUFDLFNBQVM7O0NBRTlCLGFBQWEsd0JBQUUsT0FBTyxDQUFDLENBQUMsSUFBSSxDQUFDLENBQUMsQ0FBQyxTQUFTLENBQUMsQ0FBQyxTQUFTOztDQUVuRCxnQkFBZ0Isd0JBQUUsT0FBTztFQUFFLEtBQUssd0JBQUUsUUFBUTtFQUFHLFNBQVMsd0JBQUUsUUFBUTtDQUFFLENBQUMsQ0FBQyxDQUFDLFNBQVM7QUFDaEYsQ0FBQztBQUdNLE1BQU0sd0JBQXdCLHdCQUFFLE9BQU87Q0FDNUMsYUFBYSx3QkFBRSxRQUFROztDQUV2Qix1QkFBdUIsd0JBQUUsUUFBUSxDQUFDLENBQUMsU0FBUztDQUM1QyxlQUFlLHdCQUFFLFFBQVE7Q0FDekIsV0FBVyx3QkFBRSxRQUFRO0NBQ3JCLGVBQWUsd0JBQUUsUUFBUTtDQUN6QixLQUFLLHdCQUFFLE9BQU8sRUFBRSxNQUFNLHdCQUFFLE9BQU8sQ0FBQyxDQUFDLElBQUksQ0FBQyxFQUFFLENBQUMsQ0FBQyxDQUFDLFNBQVM7QUFDdEQsQ0FBQzs7QUFJTSxNQUFNLCtCQUErQix1QkFDekMsS0FBSztDQUFFLEtBQUs7Q0FBTSxjQUFjO0FBQUssQ0FBQyxDQUFDLENBQ3ZDLE9BQU8sQ0FBQyxDQUNSLFdBQVcsV0FBVztDQUFFLEdBQUc7Q0FBTyxjQUFjO0NBQU0sS0FBSztBQUFLLEVBQUU7O0FBRzlELE1BQU0sd0JBQXlDO0NBQ3BELGFBQWE7Q0FDYix1QkFBdUI7Q0FDdkIsZUFBZTtDQUNmLFdBQVc7Q0FDWCxlQUFlO0NBQ2YsS0FBSztBQUNQIiwibmFtZXMiOltdLCJpZ25vcmVMaXN0IjpbXSwic291cmNlcyI6WyJhdXRoLnRzIl0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB7IHogfSBmcm9tIFwiem9kXCI7XG5cbmV4cG9ydCBjb25zdCBhdXRoQ2FwYWJpbGl0aWVzU2NoZW1hID0gei5vYmplY3Qoe1xuICBzc286IHpcbiAgICAub2JqZWN0KHtcbiAgICAgIG5hbWU6IHouc3RyaW5nKCkubWluKDEpLFxuICAgICAgYXZhaWxhYmlsaXR5OiB6LmVudW0oW1wiYXZhaWxhYmxlXCIsIFwidW5hdmFpbGFibGVcIiwgXCJjaGVja2luZ1wiXSksXG4gICAgfSlcbiAgICAubnVsbGFibGUoKSxcbiAgcGFzc3dvcmRBdXRoOiB6LmJvb2xlYW4oKSxcbiAgcGFzc3dvcmRSZXNldDogei5ib29sZWFuKCksXG4gIHJlc2V0VXJsOiB6LnN0cmluZygpLnVybCgpLm51bGxhYmxlKCksXG4gIC8vIE9sZGVyIHNlcnZlcnMgb21pdCB0aGlzIGZpZWxkOyBjbGllbnRzIHRyZWF0IG9taXNzaW9uIGFzIHVuYXZhaWxhYmxlLlxuICBlbWFpbENvZGU6IHouYm9vbGVhbigpLm9wdGlvbmFsKCksXG4gIGJpbGxpbmc6IHouYm9vbGVhbigpLm9wdGlvbmFsKCksXG4gIC8qKiBXZWJBdXRobiByZWx5aW5nIHBhcnR5IElEOyBudWxsIG9yIG9taXR0ZWQgd2hlbiB0aGlzIHNlcnZlciBkb2VzIG5vdCBvZmZlciBwYXNza2V5cy4gKi9cbiAgcGFzc2tleVJwSWQ6IHouc3RyaW5nKCkubWluKDEpLm51bGxhYmxlKCkub3B0aW9uYWwoKSxcbiAgLyoqIE5hdGl2ZSBhcHBzIHRoaXMgZG9tYWluIHZvdWNoZXMgZm9yOyBvbWl0dGVkIGJ5IG9sZGVyIHNlcnZlcnMsIHdoaWNoIG1lYW5zIG5vbmUuICovXG4gIG5hdGl2ZVBhc3NrZXlzOiB6Lm9iamVjdCh7IGlvczogei5ib29sZWFuKCksIGFuZHJvaWQ6IHouYm9vbGVhbigpIH0pLm9wdGlvbmFsKCksXG59KTtcbmV4cG9ydCB0eXBlIEF1dGhDYXBhYmlsaXRpZXMgPSB6LmluZmVyPHR5cGVvZiBhdXRoQ2FwYWJpbGl0aWVzU2NoZW1hPjtcblxuZXhwb3J0IGNvbnN0IGFjY291bnRTZWN1cml0eVNjaGVtYSA9IHoub2JqZWN0KHtcbiAgaGFzUGFzc3dvcmQ6IHouYm9vbGVhbigpLFxuICAvLyBPbGRlciBzZXJ2ZXJzIG9taXQgdGhpcyBmaWVsZDsgY2xpZW50cyB0cmVhdCBvbWlzc2lvbiBhcyBlbmFibGVkLlxuICBwYXNzd29yZENoYW5nZUVuYWJsZWQ6IHouYm9vbGVhbigpLm9wdGlvbmFsKCksXG4gIGZyZXNoT2lkY0F1dGg6IHouYm9vbGVhbigpLFxuICBzc29MaW5rZWQ6IHouYm9vbGVhbigpLFxuICBlbWFpbERlbGV0aW9uOiB6LmJvb2xlYW4oKSxcbiAgc3NvOiB6Lm9iamVjdCh7IG5hbWU6IHouc3RyaW5nKCkubWluKDEpIH0pLm51bGxhYmxlKCksXG59KTtcbmV4cG9ydCB0eXBlIEFjY291bnRTZWN1cml0eSA9IHouaW5mZXI8dHlwZW9mIGFjY291bnRTZWN1cml0eVNjaGVtYT47XG5cbi8qKiBPbmx5IGEgY29tcGxldGUgcHJlLVNTTyBzaGFwZSBtYXkgb3B0IGludG8gcGFzc3dvcmQtb25seSBjb21wYXRpYmlsaXR5LiAqL1xuZXhwb3J0IGNvbnN0IGxlZ2FjeUF1dGhDYXBhYmlsaXRpZXNTY2hlbWEgPSBhdXRoQ2FwYWJpbGl0aWVzU2NoZW1hXG4gIC5vbWl0KHsgc3NvOiB0cnVlLCBwYXNzd29yZEF1dGg6IHRydWUgfSlcbiAgLnN0cmljdCgpXG4gIC50cmFuc2Zvcm0oKHZhbHVlKSA9PiAoeyAuLi52YWx1ZSwgcGFzc3dvcmRBdXRoOiB0cnVlLCBzc286IG51bGwgfSkpO1xuXG4vKiogUHJlLVNTTyBzZXJ2ZXJzIG9ubHkgaGFkIGNyZWRlbnRpYWwgYWNjb3VudHMgYW5kIHBhc3N3b3JkLXByb3RlY3RlZCBkZWxldGlvbi4gKi9cbmV4cG9ydCBjb25zdCBsZWdhY3lBY2NvdW50U2VjdXJpdHk6IEFjY291bnRTZWN1cml0eSA9IHtcbiAgaGFzUGFzc3dvcmQ6IHRydWUsXG4gIHBhc3N3b3JkQ2hhbmdlRW5hYmxlZDogdHJ1ZSxcbiAgZnJlc2hPaWRjQXV0aDogZmFsc2UsXG4gIHNzb0xpbmtlZDogZmFsc2UsXG4gIGVtYWlsRGVsZXRpb246IGZhbHNlLFxuICBzc286IG51bGwsXG59O1xuIl0sImZpbGUiOiIvcGFja2FnZXMvY29udHJhY3RzL3NyYy9hdXRoLnRzIn0=
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvY29udHJhY3RzL3NyYy9hdXRoLnRzIiwiL3BhY2thZ2VzL2NvbnRyYWN0cy9zcmMvYXV0aC50cyIsW11d

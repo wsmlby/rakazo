@@ -1,0 +1,40 @@
+__vite_ssr_exportName__("messagingDmSurfaceNote", () => { try { return messagingDmSurfaceNote } catch {} });
+__vite_ssr_exportName__("messagingChannelPrivacyBlock", () => { try { return messagingChannelPrivacyBlock } catch {} });
+__vite_ssr_exportName__("messagingChannelId", () => { try { return messagingChannelId } catch {} });
+__vite_ssr_exportName__("isMessagingChannelRun", () => { try { return isMessagingChannelRun } catch {} });
+__vite_ssr_exportName__("sanitizeMessagingLabel", () => { try { return sanitizeMessagingLabel } catch {} });
+/** Instruction-stack note for bots whose owner has a messaging identity. */
+function messagingDmSurfaceNote() {
+	return [
+		"Chat surface: the owner also reaches you over a messaging app (iMessage/SMS, Slack, WhatsApp, or similar).",
+		"That conversation and this one are the same thread; anything you reply here is mirrored to their chat.",
+		"Keep replies concise. They arrive as chat messages."
+	].join(" ");
+};
+/** Hard privacy rules for bots posting into shared group channels. */
+function messagingChannelPrivacyBlock() {
+	return [
+		"You are posting to a group chat with multiple people through the deployment's shared messaging line.",
+		"Never reveal or share the owner's personal information, memory contents, scratchpad, or 1:1 conversation contents in the group.",
+		"Your posts are publicly attributed to the owner (\"<name>'s agent: …\").",
+		"Reply only when you add value to the group; otherwise finish silently without posting."
+	].join("\n");
+};
+function messagingChannelId(sourceBlocks) {
+	return sourceBlocks?.find((block) => block.kind === "channel_message")?.channelId;
+};
+/** Channel runs are messaging runs whose waking message came from a channel. */
+function isMessagingChannelRun(trigger, sourceBlocks) {
+	return trigger === "messaging" && Boolean(messagingChannelId(sourceBlocks));
+};
+/**
+* Group names and owner names are attacker-controlled text interpolated
+* into prompts and DMs; strip framing characters before they get near one.
+*/
+function sanitizeMessagingLabel(value) {
+	return value.replace(/[\r\n"[\]]/g, " ").replace(/\s+/g, " ").trim().slice(0, 64);
+}
+//# sourceMappingSource=vite-generated
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJtYXBwaW5ncyI6IkFBQUEsQ0FBQTs7Ozs7O0FBR08sU0FBUyx5QkFBaUM7Q0FDL0MsT0FBTztFQUNMO0VBQ0E7RUFDQTtDQUNGLENBQUMsQ0FBQyxLQUFLLEdBQUc7QUFDWjs7QUFHTyxTQUFTLCtCQUF1QztDQUNyRCxPQUFPO0VBQ0w7RUFDQTtFQUNBO0VBQ0E7Q0FDRixDQUFDLENBQUMsS0FBSyxJQUFJO0FBQ2I7QUFFTyxTQUFTLG1CQUFtQixjQUE4RDtDQUMvRixPQUFPLGNBQWMsTUFBTSxVQUFVLE1BQU0sU0FBUyxpQkFBaUIsQ0FBQyxFQUFFO0FBQzFFOztBQUdPLFNBQVMsc0JBQ2QsU0FDQSxjQUNTO0NBQ1QsT0FBTyxZQUFZLGVBQWUsUUFBUSxtQkFBbUIsWUFBWSxDQUFDO0FBQzVFOzs7OztBQU1PLFNBQVMsdUJBQXVCLE9BQXVCO0NBQzVELE9BQU8sTUFDSixRQUFRLGVBQWUsR0FBRyxDQUFDLENBQzNCLFFBQVEsUUFBUSxHQUFHLENBQUMsQ0FDcEIsS0FBSyxDQUFDLENBQ04sTUFBTSxHQUFHLEVBQUU7QUFDaEIiLCJuYW1lcyI6W10sImlnbm9yZUxpc3QiOltdLCJzb3VyY2VzIjpbIm1lc3NhZ2luZy1wcm9tcHRzLnRzIl0sInNvdXJjZXNDb250ZW50IjpbImltcG9ydCB0eXBlIHsgTWVzc2FnZUJsb2NrIH0gZnJvbSBcIkByYWthem8vY29udHJhY3RzXCI7XG5cbi8qKiBJbnN0cnVjdGlvbi1zdGFjayBub3RlIGZvciBib3RzIHdob3NlIG93bmVyIGhhcyBhIG1lc3NhZ2luZyBpZGVudGl0eS4gKi9cbmV4cG9ydCBmdW5jdGlvbiBtZXNzYWdpbmdEbVN1cmZhY2VOb3RlKCk6IHN0cmluZyB7XG4gIHJldHVybiBbXG4gICAgXCJDaGF0IHN1cmZhY2U6IHRoZSBvd25lciBhbHNvIHJlYWNoZXMgeW91IG92ZXIgYSBtZXNzYWdpbmcgYXBwIChpTWVzc2FnZS9TTVMsIFNsYWNrLCBXaGF0c0FwcCwgb3Igc2ltaWxhcikuXCIsXG4gICAgXCJUaGF0IGNvbnZlcnNhdGlvbiBhbmQgdGhpcyBvbmUgYXJlIHRoZSBzYW1lIHRocmVhZDsgYW55dGhpbmcgeW91IHJlcGx5IGhlcmUgaXMgbWlycm9yZWQgdG8gdGhlaXIgY2hhdC5cIixcbiAgICBcIktlZXAgcmVwbGllcyBjb25jaXNlLiBUaGV5IGFycml2ZSBhcyBjaGF0IG1lc3NhZ2VzLlwiLFxuICBdLmpvaW4oXCIgXCIpO1xufVxuXG4vKiogSGFyZCBwcml2YWN5IHJ1bGVzIGZvciBib3RzIHBvc3RpbmcgaW50byBzaGFyZWQgZ3JvdXAgY2hhbm5lbHMuICovXG5leHBvcnQgZnVuY3Rpb24gbWVzc2FnaW5nQ2hhbm5lbFByaXZhY3lCbG9jaygpOiBzdHJpbmcge1xuICByZXR1cm4gW1xuICAgIFwiWW91IGFyZSBwb3N0aW5nIHRvIGEgZ3JvdXAgY2hhdCB3aXRoIG11bHRpcGxlIHBlb3BsZSB0aHJvdWdoIHRoZSBkZXBsb3ltZW50J3Mgc2hhcmVkIG1lc3NhZ2luZyBsaW5lLlwiLFxuICAgIFwiTmV2ZXIgcmV2ZWFsIG9yIHNoYXJlIHRoZSBvd25lcidzIHBlcnNvbmFsIGluZm9ybWF0aW9uLCBtZW1vcnkgY29udGVudHMsIHNjcmF0Y2hwYWQsIG9yIDE6MSBjb252ZXJzYXRpb24gY29udGVudHMgaW4gdGhlIGdyb3VwLlwiLFxuICAgICdZb3VyIHBvc3RzIGFyZSBwdWJsaWNseSBhdHRyaWJ1dGVkIHRvIHRoZSBvd25lciAoXCI8bmFtZT5cXCdzIGFnZW50OiDigKZcIikuJyxcbiAgICBcIlJlcGx5IG9ubHkgd2hlbiB5b3UgYWRkIHZhbHVlIHRvIHRoZSBncm91cDsgb3RoZXJ3aXNlIGZpbmlzaCBzaWxlbnRseSB3aXRob3V0IHBvc3RpbmcuXCIsXG4gIF0uam9pbihcIlxcblwiKTtcbn1cblxuZXhwb3J0IGZ1bmN0aW9uIG1lc3NhZ2luZ0NoYW5uZWxJZChzb3VyY2VCbG9ja3M6IE1lc3NhZ2VCbG9ja1tdIHwgdW5kZWZpbmVkKTogc3RyaW5nIHwgdW5kZWZpbmVkIHtcbiAgcmV0dXJuIHNvdXJjZUJsb2Nrcz8uZmluZCgoYmxvY2spID0+IGJsb2NrLmtpbmQgPT09IFwiY2hhbm5lbF9tZXNzYWdlXCIpPy5jaGFubmVsSWQ7XG59XG5cbi8qKiBDaGFubmVsIHJ1bnMgYXJlIG1lc3NhZ2luZyBydW5zIHdob3NlIHdha2luZyBtZXNzYWdlIGNhbWUgZnJvbSBhIGNoYW5uZWwuICovXG5leHBvcnQgZnVuY3Rpb24gaXNNZXNzYWdpbmdDaGFubmVsUnVuKFxuICB0cmlnZ2VyOiBzdHJpbmcsXG4gIHNvdXJjZUJsb2NrczogTWVzc2FnZUJsb2NrW10gfCB1bmRlZmluZWQsXG4pOiBib29sZWFuIHtcbiAgcmV0dXJuIHRyaWdnZXIgPT09IFwibWVzc2FnaW5nXCIgJiYgQm9vbGVhbihtZXNzYWdpbmdDaGFubmVsSWQoc291cmNlQmxvY2tzKSk7XG59XG5cbi8qKlxuICogR3JvdXAgbmFtZXMgYW5kIG93bmVyIG5hbWVzIGFyZSBhdHRhY2tlci1jb250cm9sbGVkIHRleHQgaW50ZXJwb2xhdGVkXG4gKiBpbnRvIHByb21wdHMgYW5kIERNczsgc3RyaXAgZnJhbWluZyBjaGFyYWN0ZXJzIGJlZm9yZSB0aGV5IGdldCBuZWFyIG9uZS5cbiAqL1xuZXhwb3J0IGZ1bmN0aW9uIHNhbml0aXplTWVzc2FnaW5nTGFiZWwodmFsdWU6IHN0cmluZyk6IHN0cmluZyB7XG4gIHJldHVybiB2YWx1ZVxuICAgIC5yZXBsYWNlKC9bXFxyXFxuXCJbXFxdXS9nLCBcIiBcIilcbiAgICAucmVwbGFjZSgvXFxzKy9nLCBcIiBcIilcbiAgICAudHJpbSgpXG4gICAgLnNsaWNlKDAsIDY0KTtcbn1cbiJdLCJmaWxlIjoiL3BhY2thZ2VzL2NvcmUvc3JjL21lc3NhZ2luZy1wcm9tcHRzLnRzIn0=
+
+//# vitestCache=W3siZmlsZSI6IjEiLCJpZCI6IjEiLCJ1cmwiOiIyIiwiaW1wb3J0ZWRVcmxzIjoiMyIsIm1hcHBpbmdzIjpmYWxzZX0sIi9ob21lL3J1bm5lci93b3JrL3Jha2F6by9yYWthem8vcGFja2FnZXMvY29yZS9zcmMvbWVzc2FnaW5nLXByb21wdHMudHMiLCIvcGFja2FnZXMvY29yZS9zcmMvbWVzc2FnaW5nLXByb21wdHMudHMiLFtdXQ==

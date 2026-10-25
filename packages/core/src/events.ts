@@ -79,6 +79,8 @@ export function projectMessages(
         threadId: event.threadId,
         seq: event.seq,
         role,
+        authorUserId: typeof payload.authorUserId === "string" ? payload.authorUserId : undefined,
+        authorName: typeof payload.authorName === "string" ? payload.authorName : undefined,
         blocks,
         botId: event.botId ?? undefined,
         runId: event.runId ?? undefined,

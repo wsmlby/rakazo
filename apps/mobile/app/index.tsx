@@ -1975,6 +1975,7 @@ const BotRow = memo(function BotRow({
   return onAction ? (
     <InboxSwipeRow
       rowKey={`bot:${bot.id}`}
+      accessRole={bot.accessRole}
       unread={bot.unread}
       pinned={bot.pinned}
       notifyOnFinish={bot.notifyOnFinish}

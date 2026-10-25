@@ -61,6 +61,7 @@ export const MessageView = memo(function MessageView({
   speaking,
   onSpeak,
   onOpenComputer,
+  canManageBot = true,
   showToolActivity,
   onReply,
   onMarkUnread,
@@ -95,6 +96,7 @@ export const MessageView = memo(function MessageView({
   speaking: boolean;
   onSpeak: () => void;
   onOpenComputer: (botId?: string) => void;
+  canManageBot?: boolean;
   showToolActivity: boolean;
   onReply: (message: ThreadMessage) => void;
   onMarkUnread: (message: ThreadMessage) => void;
@@ -136,6 +138,11 @@ export const MessageView = memo(function MessageView({
   );
   const messageContext = (
     <>
+      {message.role === "user" && message.authorName ? (
+        <div className="mb-1.5 text-xs font-medium text-muted-foreground" dir="auto">
+          {message.authorName}
+        </div>
+      ) : null}
       {speakerName ? (
         <div
           className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold tracking-tight"
@@ -156,7 +163,7 @@ export const MessageView = memo(function MessageView({
         fallbackText={replyParent ? previewMessageText(replyParent) : undefined}
         author={
           (message.replyPreview?.role ?? replyParent?.role) === "user"
-            ? t`You`
+            ? (replyParent?.authorName ?? "")
             : ((replyBotId ? peerBot(replyBotId)?.name : undefined) ??
               memberName?.(replyBotId) ??
               t`Bot`)
@@ -375,11 +382,13 @@ export const MessageView = memo(function MessageView({
             );
           }
           if (block.kind === "choice") {
+            if (!canManageBot) return null;
             const botId = "botId" in artifactTarget ? artifactTarget.botId : message.botId;
             if (!botId) return null;
             return <ChoiceCard key={i} botId={botId} block={block} onBotChanged={onBotChanged} />;
           }
           if (block.kind === "app_connect") {
+            if (!canManageBot) return null;
             const botId = "botId" in artifactTarget ? artifactTarget.botId : message.botId;
             if (!botId) return null;
             return (
@@ -401,6 +410,7 @@ export const MessageView = memo(function MessageView({
             );
           }
           if (block.kind === "mcp_approval") {
+            if (!canManageBot) return null;
             const botId = "botId" in artifactTarget ? artifactTarget.botId : message.botId;
             if (!botId) return null;
             return (
@@ -506,6 +516,7 @@ export const MessageView = memo(function MessageView({
             );
           }
           if (block.kind === "ask") {
+            if (!canManageBot && block.instructionUpdate) return null;
             return (
               <div
                 key={i}
@@ -524,6 +535,7 @@ export const MessageView = memo(function MessageView({
           }
           if (block.kind === "cloud_agent") return <CloudAgentCard key={i} block={block} />;
           if (block.kind === "skill_draft") {
+            if (!canManageBot) return null;
             return (
               <div key={i} className="flex justify-start">
                 <SkillDraftCard block={block} onRefresh={onRefresh} onAddRoutine={onAddRoutine} />
@@ -531,6 +543,7 @@ export const MessageView = memo(function MessageView({
             );
           }
           if (block.kind === "computer") {
+            if (!canManageBot) return null;
             return (
               <div
                 key={i}

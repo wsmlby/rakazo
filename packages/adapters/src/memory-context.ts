@@ -10,12 +10,14 @@ type ScopedMemoryDocument = MemorySnapshot["documents"][number] & {
 export async function loadAgentMemoryContext(
   memory: MemoryStore,
   botId: string,
-  context: AdapterContext,
+  context: AdapterContext & { conversationOnly?: boolean },
   maxBytes = MAX_AGENT_MEMORY_BYTES,
 ): Promise<string | undefined> {
   const [botMemory, userMemory] = await Promise.all([
     memory.read({ scope: "bot", botId }, context),
-    memory.read({ scope: "user" }, context),
+    context.conversationOnly || context.collaborationRestricted
+      ? Promise.resolve({ documents: [] })
+      : memory.read({ scope: "user" }, context),
   ]);
   const documents: ScopedMemoryDocument[] = [
     ...botMemory.documents.map((document) => ({ ...document, scope: "bot" as const })),

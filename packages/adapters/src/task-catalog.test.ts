@@ -2,6 +2,36 @@ import { describe, expect, it, vi } from "vitest";
 import { TASK_CATALOG_GUIDANCE, taskCatalogFromTool } from "./task-catalog.js";
 
 describe("task catalog", () => {
+  it("omits owner personal skills while retaining bot-scoped work for a shared bot", async () => {
+    const prisma = {
+      scratchpadItem: { findMany: vi.fn(async () => []) },
+      routine: { findMany: vi.fn(async () => []) },
+      taughtSkill: {
+        findMany: vi.fn(async () => [
+          { id: "taught-1", name: "Export", goal: "Export report", status: "saved" },
+        ]),
+      },
+      agentSkill: { findMany: vi.fn(async () => []) },
+    };
+    const result = await taskCatalogFromTool(
+      { prisma: prisma as never },
+      {
+        spaceId: "space-1",
+        userId: "owner-1",
+        botId: "bot-1",
+        collaborationRestricted: true,
+        tools: [],
+      },
+    );
+    expect(result.skills).toEqual([]);
+    expect(result.taughtSkills).toHaveLength(1);
+    expect(prisma.agentSkill.findMany).not.toHaveBeenCalled();
+    expect(prisma.taughtSkill.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { spaceId: "space-1", botId: "bot-1", status: "saved" },
+      }),
+    );
+  });
   it("returns the bot's real work records and exposed tool roster", async () => {
     const prisma = {
       scratchpadItem: {
